@@ -135,3 +135,4 @@ Copy `backend/.env.example` to `backend/.env` and fill in:
 | chart-orange | `#E59A3A` | Calories / goals |
 | chart-purple | `#8C6FAE` | Strength / endurance |
 | chart-olive | `#4F7C63` | Consistency / steps |
+"# adaptive-fitness" 

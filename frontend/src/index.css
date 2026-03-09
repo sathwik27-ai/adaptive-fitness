@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@700;800&family=Fira+Code:wght@400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply font-sans text-text-primary;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-bg-main min-h-screen;
+  }
+  * {
+    @apply box-border;
+  }
+}
+
+@layer components {
+  /* Focus ring — WCAG 2.1 AA */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+
+  /* Scrollbar */
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { @apply bg-bg-surface rounded-full; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-accent-light rounded-full; }
+}
+
+/* ─── Dark Mode ─── */
+html.dark {
+  --color-bg-main: #1a1a1a;
+  --color-bg-secondary: #222222;
+  --color-bg-card: #2a2a2a;
+  --color-bg-surface: #333333;
+  --color-primary: #4F7C63;
+  --color-primary-hover: #3d6b50;
+  --color-accent-light: #6F8F76;
+  --color-accent-soft: #3d6b50;
+  --color-cta: #e8e0d4;
+  --color-text-primary: #e8e0d4;
+  --color-text-secondary: #b0a89a;
+  --color-text-muted: #787069;
+}
+
+html.dark body { background-color: var(--color-bg-main); color: var(--color-text-primary); }
+html.dark .bg-bg-main { background-color: var(--color-bg-main); }
+html.dark .bg-bg-secondary { background-color: var(--color-bg-secondary); }
+html.dark .bg-bg-card { background-color: var(--color-bg-card); }
+html.dark .bg-bg-surface { background-color: var(--color-bg-surface); }
+html.dark .text-cta { color: var(--color-cta); }
+html.dark .text-text-primary { color: var(--color-text-primary); }
+html.dark .text-text-secondary { color: var(--color-text-secondary); }
+html.dark .text-text-muted { color: var(--color-text-muted); }
+html.dark .bg-primary { background-color: var(--color-primary); }
+html.dark .text-primary { color: var(--color-primary); }
+html.dark .border-bg-surface { border-color: var(--color-bg-surface); }
+html.dark .border-primary { border-color: var(--color-primary); }
+html.dark .shadow-card { box-shadow: 0 4px 24px rgba(0,0,0,0.3); }

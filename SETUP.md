@@ -181,6 +181,8 @@ Set these project environment variables in the hosting dashboards (never in comm
 
 The frontend uses credentialed requests. The backend must return the exact Vercel origin in CORS responses and set the HTTP-only JWT cookie with `SameSite=None; Secure` in production. Local development uses `SameSite=Lax` and does not require cross-site cookies. Do not set a cookie domain; it should remain host-only for the API host. After changing Vercel variables, redeploy the frontend so Vite includes the new API URL. After changing backend code or Render variables, redeploy the Render service.
 
+The Vercel project should use `frontend` as its Root Directory; `frontend\vercel.json` rewrites app routes to the Vite entry document so direct links such as `/register` work. If the Vercel Root Directory is set to the repository root instead, configure the build/output settings for `frontend` and ensure this rewrite configuration is applied by that deployment.
+
 Verify `/api/health`, then test account login, onboarding submission, navigation to a protected page, refresh, and logout in a production browser. Hosting health and CORS preflight alone do not verify an authenticated session. Some browsers block third-party cookies across the separate `vercel.app` and `onrender.com` sites; if that applies, configure custom frontend and API domains under the same site and update the frontend URL, API base URL, backend CORS origin, and OAuth callback URLs.
 
 ## 10. Troubleshooting
@@ -189,6 +191,7 @@ Verify `/api/health`, then test account login, onboarding submission, navigation
 - **MongoDB connection error / server selection timeout:** make sure MongoDB is running locally, or check the Atlas URI, database-user password, IP access list, network access, and database name. The API intentionally does not listen if the database connection fails.
 - **`npm ci` reports an unsupported engine:** install Node.js 20.19+ or 22.12+ (or newer supported Node release), open a fresh terminal, and retry.
 - **Browser reports CORS or failed API requests:** backend should be on port 5000; frontend on 5173. If you changed either, align `PORT`, `FRONTEND_URL`, and `VITE_API_BASE_URL` (include `/api` in the frontend URL), then restart both dev servers.
+- **Registration URL returns a Vercel 404:** deploy with `frontend` as the Vercel Root Directory so its SPA rewrite configuration handles `/register` and other client routes.
 - **Login works but refresh redirects to login:** confirm the browser accepts the HTTP-only cookie and that frontend requests use the same local host (`localhost`, not a mix of `localhost` and `127.0.0.1`). Keep `FRONTEND_URL=http://localhost:5173`.
 - **Onboarding request fails and returns to login:** inspect the response status and message for `PATCH /api/users/me` in the browser Network panel. An explicit `SESSION_INVALID` response indicates the backend did not accept the session; other failures should stay on onboarding and show an error. Do not copy or share request cookies.
 - **OAuth responds “not configured” or provider rejects redirect:** configure the complete credential pair and the exact callback URL in the provider console, then restart the backend.

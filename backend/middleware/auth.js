@@ -6,6 +6,7 @@ const protect = (req, res, next) => {
         if (!user) {
             return res.status(401).json({
                 success: false,
+                code: 'SESSION_INVALID',
                 message: 'Your session is invalid or has expired. Please sign in again.',
             });
         }

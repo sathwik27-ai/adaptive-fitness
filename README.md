@@ -57,8 +57,8 @@ Fitness information and day-to-day tracking can be scattered across separate too
 ## How authentication and planning work
 
 1. Registration or login sends credentials to the Express API. The server validates the account and sets a signed JWT in an HTTP-only cookie; the token is not stored in browser local storage.
-2. The frontend includes cookies with API requests. On app startup, it checks the current session through `GET /api/users/me`; protected routes wait for that check before rendering or redirecting.
-3. During onboarding, the frontend submits personal metrics and workout preferences to `PATCH /api/users/me`. The backend persists the profile and creates a workout schedule, then the frontend routes the completed account to the dashboard.
+2. The frontend includes cookies with API requests. On app startup, it checks the current session through `GET /api/users/me`; protected routes wait for that check before rendering or redirecting. A stale unauthenticated session check cannot clear a login completed while that check was in flight. Only an explicit `SESSION_INVALID` response from the backend expires an established frontend session; other request failures remain on the current page.
+3. During onboarding, the frontend submits personal metrics and workout preferences to `PATCH /api/users/me`. Only after the API confirms `user.onboardingComplete` does the frontend update auth state and navigate to the dashboard. Request failures remain visible on onboarding; only an explicit invalid-session response clears an existing authenticated session.
 4. Diet planning is a separate workflow. The user submits diet preferences to `POST /api/diet/generate`; meals and food logs are managed through the diet API.
 5. Logout calls the protected API endpoint and clears the same HTTP-only cookie.
 
@@ -256,6 +256,7 @@ After code changes, push the verified commit and confirm that Vercel and Render 
 | Seed sample workouts | `npm run seed:workouts` in `backend` |
 | Start frontend dev server | `npm run dev` in `frontend` |
 | Lint frontend | `npm run lint` in `frontend` |
+| Test auth response handling | `npm test` in `frontend` |
 | Build frontend for production | `npm run build` in `frontend` |
 | Preview frontend build | `npm run preview` in `frontend` |
 
@@ -270,6 +271,7 @@ Stop each development server with **Ctrl+C** in its terminal window.
 | Browser reports a CORS error | Ensure `FRONTEND_URL` matches the origin in the address bar. `localhost` and `127.0.0.1` are different hostnames; use one hostname consistently for frontend and API. Restart the backend after changes. |
 | Frontend cannot reach the API | Confirm the backend is running on port 5000 and check `VITE_API_BASE_URL`. Restart Vite after changing frontend environment variables. |
 | Production login succeeds but onboarding/dashboard sends you back to login | The API must issue a cross-site cookie with `SameSite=None; Secure`. Set `NODE_ENV=production` on Render and verify `FRONTEND_URL` and Vercel's `VITE_API_BASE_URL` match the deployment URLs above; redeploy both services after relevant changes. Browser third-party-cookie blocking may require same-site custom domains. |
+| Onboarding request fails but user is sent to login | The frontend clears auth only when a protected API response explicitly identifies an invalid session. Other failures stay on onboarding and display the API error. Check the failed `PATCH /api/users/me` response in the browser Network panel; do not share request cookies or credentials. |
 | Login suddenly stops accepting an existing session | A changed `JWT_SECRET` invalidates previously issued tokens. Sign in again; avoid rotating the secret unless intended. |
 | No workouts appear | Run `npm run seed:workouts` from `backend` and check that the API uses the same database you seeded. |
 | Google/Facebook login, email, uploads, AI, or Fit sync unavailable | These require the corresponding optional provider credentials and correctly configured provider account/callbacks. Core local use does not include provider credentials. |

@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { clearCredentials } from '../features/authSlice';
+import { shouldClearSession } from './authErrors';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
     || `${window.location.protocol}//${window.location.hostname}:5000/api`;
@@ -10,8 +11,9 @@ const rawBaseQuery = fetchBaseQuery({
 });
 
 const baseQuery = async (args, api, extraOptions) => {
+    const wasAuthenticated = api.getState().auth.isAuthenticated;
     const result = await rawBaseQuery(args, api, extraOptions);
-    if (result.error?.status === 401) {
+    if (shouldClearSession(result, wasAuthenticated)) {
         api.dispatch(clearCredentials());
     }
     return result;

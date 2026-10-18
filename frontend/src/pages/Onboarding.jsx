@@ -29,7 +29,6 @@ export default function Onboarding() {
     const [step, setStep] = useState(0);
     const [formData, setFormData] = useState({});
     const [equipment, setEquipment] = useState([]);
-    const [done, setDone] = useState(false);
     const [submitError, setSubmitError] = useState('');
 
     const schema = [
@@ -39,7 +38,7 @@ export default function Onboarding() {
         z.object({ location: z.enum(['home', 'gym']), timePerWorkout: z.coerce.number().min(10).max(180) }),
     ][step];
 
-    const { control, register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) });
+    const { control, register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema) });
     const selectedGender = useWatch({ control, name: 'gender' });
     const selectedGoal = useWatch({ control, name: 'goal' });
     const selectedFitnessLevel = useWatch({ control, name: 'fitnessLevel' });
@@ -47,6 +46,7 @@ export default function Onboarding() {
     const workoutDuration = useWatch({ control, name: 'timePerWorkout' });
 
     const onNext = async (data) => {
+        setSubmitError('');
         const merged = { ...formData, ...data };
         setFormData(merged);
         if (step < 3) { setStep(s => s + 1); return; }
@@ -63,10 +63,15 @@ export default function Onboarding() {
                     timePerWorkout: merged.timePerWorkout,
                 },
             }).unwrap();
+            if (!res?.user?.onboardingComplete) {
+                throw new Error('The server did not confirm that onboarding was completed.');
+            }
             dispatch(setCredentials(res.user));
-            setDone(true);
+            navigate('/dashboard');
         } catch (err) {
-            const message = typeof err?.data === 'string'
+            const message = err instanceof Error
+                ? err.message
+                : typeof err?.data === 'string'
                 ? err.data
                 : err?.data?.message;
             setSubmitError(message || 'Could not save onboarding. Please try again.');
@@ -75,23 +80,6 @@ export default function Onboarding() {
 
     const toggleEquipment = (item) =>
         setEquipment(e => e.includes(item) ? e.filter(x => x !== item) : [...e, item]);
-
-    if (done) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-bg-main px-4">
-                <div className="text-center max-w-sm">
-                    <div className="flex justify-center mb-6 animate-bounce">
-                        <CheckCircle size={64} className="text-primary" />
-                    </div>
-                    <h2 className="text-3xl font-extrabold text-cta mb-3 flex items-center justify-center gap-2">
-                        Your Plan Is Ready!
-                    </h2>
-                    <p className="text-text-secondary mb-8">We've built your personalized workout and meal plan based on your goals.</p>
-                    <Button variant="primary" size="lg" onClick={() => navigate('/dashboard')}>Go to Dashboard →</Button>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-bg-main flex flex-col items-center justify-center px-4 py-12">
@@ -230,8 +218,8 @@ export default function Onboarding() {
                                     ← Back
                                 </Button>
                             )}
-                            <Button type="submit" variant="primary" size="md" className="flex-1">
-                                {step < 3 ? 'Continue →' : <span className="flex items-center gap-2 justify-center">Generate My Plan <CheckCircle size={18} /></span>}
+                            <Button type="submit" variant="primary" size="md" className="flex-1" disabled={isSubmitting}>
+                                {step < 3 ? 'Continue →' : <span className="flex items-center gap-2 justify-center">{isSubmitting ? 'Generating Plan…' : 'Generate My Plan'} <CheckCircle size={18} /></span>}
                             </Button>
                             {step < 3 && (
                                 <Button type="button" variant="ghost" size="md" onClick={() => setStep(s => s + 1)}>

@@ -151,6 +151,7 @@ Optional checks:
 
 ```powershell
 Push-Location frontend
+npm test
 npm run lint
 npm run build
 Pop-Location
@@ -189,6 +190,7 @@ Verify `/api/health`, then test account login, onboarding submission, navigation
 - **`npm ci` reports an unsupported engine:** install Node.js 20.19+ or 22.12+ (or newer supported Node release), open a fresh terminal, and retry.
 - **Browser reports CORS or failed API requests:** backend should be on port 5000; frontend on 5173. If you changed either, align `PORT`, `FRONTEND_URL`, and `VITE_API_BASE_URL` (include `/api` in the frontend URL), then restart both dev servers.
 - **Login works but refresh redirects to login:** confirm the browser accepts the HTTP-only cookie and that frontend requests use the same local host (`localhost`, not a mix of `localhost` and `127.0.0.1`). Keep `FRONTEND_URL=http://localhost:5173`.
+- **Onboarding request fails and returns to login:** inspect the response status and message for `PATCH /api/users/me` in the browser Network panel. An explicit `SESSION_INVALID` response indicates the backend did not accept the session; other failures should stay on onboarding and show an error. Do not copy or share request cookies.
 - **OAuth responds “not configured” or provider rejects redirect:** configure the complete credential pair and the exact callback URL in the provider console, then restart the backend.
 - **Workout image uploads fail:** configure all three Cloudinary values. This integration is not needed for seeded/default workout data.
 - **Port already in use:** close the old dev server or set an unused `PORT` and update `VITE_API_BASE_URL` accordingly.

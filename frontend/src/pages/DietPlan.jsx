@@ -25,7 +25,10 @@ const dietSchema = z.object({
     goal: z.enum(['weight-loss', 'muscle-gain', 'maintenance']),
     activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very-active']),
     region: z.string().optional(),
-    dailyCalorieTarget: z.coerce.number().min(800).max(10000).optional(),
+    dailyCalorieTarget: z.preprocess(
+        (value) => value === '' || value == null ? undefined : value,
+        z.coerce.number().min(800).max(10000).optional()
+    ),
     budget: z.enum(['low', 'medium', 'high']),
 });
 
@@ -46,12 +49,27 @@ export default function DietPlan() {
     const [generate, { isLoading: isGenerating }] = useGenerateDietMutation();
     const [swapMeal, { isLoading: isSwapping }] = useSwapMealMutation();
     const [logFood] = useLogFoodMutation();
-    const { data: logsData } = useGetFoodLogsQuery({});
 
     const todayIndex = (new Date().getDay() + 6) % 7;
     const [activeDay, setActiveDay] = useState(todayIndex);
     const [showForm, setShowForm] = useState(false);
     const [logEntry, setLogEntry] = useState({ mealType: 'breakfast', name: '', calories: '', protein: '', carbs: '', fats: '' });
+    const selectedDate = new Date();
+    selectedDate.setHours(0, 0, 0, 0);
+    selectedDate.setDate(selectedDate.getDate() + activeDay - todayIndex);
+    const selectedDateKey = [
+        selectedDate.getFullYear(),
+        String(selectedDate.getMonth() + 1).padStart(2, '0'),
+        String(selectedDate.getDate()).padStart(2, '0'),
+    ].join('-');
+    const logDayStart = new Date(`${selectedDateKey}T00:00:00.000Z`);
+    const logDayEnd = new Date(logDayStart);
+    logDayEnd.setUTCDate(logDayEnd.getUTCDate() + 1);
+    logDayEnd.setUTCMilliseconds(-1);
+    const { data: logsData } = useGetFoodLogsQuery({
+        from: logDayStart.toISOString(),
+        to: logDayEnd.toISOString(),
+    });
 
     const [saveDiet, { isLoading: isSaving }] = useSaveDietMutation();
 
@@ -75,11 +93,11 @@ export default function DietPlan() {
     const currentDayIndex = currentDayPlan ? weeklyPlan.indexOf(currentDayPlan) : -1;
     const target = profile?.dailyCalorieTarget || 2000;
 
-    const todayLog = logsData?.logs?.[0]; // Assume today's log is first
-    const consumed = todayLog?.totalCalories || 0;
-    const actualProtein = todayLog?.totalProtein || 0;
-    const actualCarbs = todayLog?.totalCarbs || 0;
-    const actualFats = todayLog?.totalFats || 0;
+    const selectedDayLog = logsData?.logs?.[0];
+    const consumed = selectedDayLog?.totalCalories || 0;
+    const actualProtein = selectedDayLog?.totalProtein || 0;
+    const actualCarbs = selectedDayLog?.totalCarbs || 0;
+    const actualFats = selectedDayLog?.totalFats || 0;
 
     const macroCompareData = useMemo(() => {
         if (!profile?.macroTargets) return [];
@@ -95,10 +113,11 @@ export default function DietPlan() {
 
     const onSubmit = async (data) => {
         try {
-            await generate(data).unwrap();
+            const result = await generate(data).unwrap();
             setShowForm(false);
+            toast.success(`${result.profile.dietType.replace('-', ' ')} meal plan generated.`);
         } catch (err) {
-            console.error('Generation failed', err);
+            toast.error(err?.data?.message || 'Could not generate your meal plan.');
         }
     };
 
@@ -127,19 +146,26 @@ export default function DietPlan() {
     };
 
     const handleLog = async () => {
-        if (!logEntry.name || !logEntry.calories) return;
+        if (!currentDayPlan || !logEntry.name.trim() || logEntry.calories === '') {
+            toast.error('Choose a day and enter a meal description and calories.');
+            return;
+        }
         try {
             await logFood({
                 ...logEntry,
+                name: logEntry.name.trim(),
                 calories: Number(logEntry.calories),
                 protein: Number(logEntry.protein || 0),
                 carbs: Number(logEntry.carbs || 0),
                 fats: Number(logEntry.fats || 0),
-                targetCalories: target
+                targetCalories: target,
+                date: selectedDateKey,
+                planDay: currentDayPlan.day || selectedDayName,
             }).unwrap();
             setLogEntry({ mealType: 'breakfast', name: '', calories: '', protein: '', carbs: '', fats: '' });
+            toast.success(`Meal logged for ${currentDayPlan.day || selectedDayName}.`);
         } catch (err) {
-            console.error('Logging failed', err);
+            toast.error(err?.data?.message || 'Could not save this meal.');
         }
     };
 
@@ -177,12 +203,12 @@ export default function DietPlan() {
                         <Sparkles size={20} /> Tailor Your Diet
                     </h2>
                     <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <Input label="Diet Preference" select options={['veg', 'non-veg', 'vegan', 'keto', 'paleo']} {...register('dietType')} error={errors.dietType?.message} />
-                        <Input label="Fitness Goal" select options={['weight-loss', 'muscle-gain', 'maintenance']} {...register('goal')} error={errors.goal?.message} />
-                        <Input label="Activity Level" select options={['sedentary', 'light', 'moderate', 'active', 'very-active']} {...register('activityLevel')} error={errors.activityLevel?.message} />
+                        <SelectField label="Diet Preference" options={['veg', 'non-veg', 'vegan', 'keto', 'paleo']} {...register('dietType')} error={errors.dietType?.message} />
+                        <SelectField label="Fitness Goal" options={['weight-loss', 'muscle-gain', 'maintenance']} {...register('goal')} error={errors.goal?.message} />
+                        <SelectField label="Activity Level" options={['sedentary', 'light', 'moderate', 'active', 'very-active']} {...register('activityLevel')} error={errors.activityLevel?.message} />
                         <Input label="Regional Cuisine" placeholder="e.g. Indian, Mediterranean" {...register('region')} />
                         <Input label="Calorie Override (Optional)" type="number" {...register('dailyCalorieTarget')} />
-                        <Input label="Budget Preference" select options={['low', 'medium', 'high']} {...register('budget')} />
+                        <SelectField label="Budget Preference" options={['low', 'medium', 'high']} {...register('budget')} error={errors.budget?.message} />
                         <div className="md:col-span-2 lg:col-span-3 pt-4">
                             <Button type="submit" variant="primary" className="w-full" disabled={isGenerating}>
                                 {isGenerating ? 'Recalculating...' : 'Generate AI Meal Plan'}
@@ -227,7 +253,7 @@ export default function DietPlan() {
                     <div className="grid lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 bg-bg-card rounded-card shadow-card p-6 md:p-8 space-y-6">
                             <h3 className="font-bold text-lg text-primary flex items-center gap-2">
-                                <PieIcon size={20} /> Today's Adherence
+                                <PieIcon size={20} /> {currentDayPlan?.day || selectedDayName}'s Adherence
                             </h3>
                             <div className="grid md:grid-cols-2 gap-8 items-center">
                                 <div className="h-48 relative">
@@ -262,16 +288,29 @@ export default function DietPlan() {
                         {/* Food Logging */}
                         <div className="bg-bg-card rounded-card shadow-card p-6 md:p-8 space-y-4 border border-secondary/10">
                             <h3 className="font-bold text-lg text-secondary flex items-center gap-2 underline decoration-secondary/30">
-                                <Edit3 size={20} /> Log a Meal
+                                <Edit3 size={20} /> Log a Meal for {currentDayPlan?.day || selectedDayName}
                             </h3>
                             <div className="space-y-3">
-                                <Input label="Meal Type" select options={MEAL_TYPES.map(m => m.replace('_', ' '))} value={logEntry.mealType} onChange={e => setLogEntry(p => ({ ...p, mealType: e.target.value.replace(' ', '_') }))} />
+                                <SelectField label="Meal Type" options={MEAL_TYPES.map((mealType) => ({ value: mealType, label: mealType.replaceAll('_', ' ') }))} value={logEntry.mealType} onChange={e => setLogEntry(p => ({ ...p, mealType: e.target.value }))} />
                                 <Input label="Description" placeholder="e.g. Protein Shake" value={logEntry.name} onChange={e => setLogEntry(p => ({ ...p, name: e.target.value }))} />
                                 <div className="grid grid-cols-2 gap-2">
                                     <Input label="Cals" type="number" value={logEntry.calories} onChange={e => setLogEntry(p => ({ ...p, calories: e.target.value }))} />
                                     <Input label="Prot" type="number" value={logEntry.protein} onChange={e => setLogEntry(p => ({ ...p, protein: e.target.value }))} />
                                 </div>
                                 <Button className="w-full mt-2" variant="green" size="sm" onClick={handleLog}>Log Entry</Button>
+                                {selectedDayLog?.entries?.length > 0 && (
+                                    <div className="border-t border-bg-surface pt-3">
+                                        <h4 className="mb-2 text-sm font-semibold text-text-primary">Logged for {currentDayPlan?.day || selectedDayName}</h4>
+                                        <ul className="space-y-2">
+                                            {selectedDayLog.entries.map((entry, index) => (
+                                                <li key={`${entry._id || entry.loggedAt}-${index}`} className="flex justify-between gap-3 text-sm text-text-secondary">
+                                                    <span className="capitalize">{(entry.mealType || 'meal').replaceAll('_', ' ')}: {entry.name}</span>
+                                                    <span className="shrink-0">{entry.calories} kcal</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -368,4 +407,27 @@ function Calendar(props) {
             <rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
         </svg>
     )
+}
+
+function SelectField({ label, options, error, ...selectProps }) {
+    const id = label.toLowerCase().replace(/\s+/g, '-');
+    return (
+        <div className="flex flex-col gap-1">
+            <label htmlFor={id} className="text-sm font-medium text-text-secondary">{label}</label>
+            <select
+                id={id}
+                aria-invalid={!!error}
+                aria-describedby={error ? `${id}-error` : undefined}
+                className={`w-full rounded-btn border px-4 py-2.5 text-text-primary bg-bg-surface min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${error ? 'border-red-500' : 'border-bg-surface'}`}
+                {...selectProps}
+            >
+                {options.map((option) => {
+                    const value = typeof option === 'string' ? option : option.value;
+                    const optionLabel = typeof option === 'string' ? option.replaceAll('-', ' ') : option.label;
+                    return <option key={value} value={value}>{optionLabel}</option>;
+                })}
+            </select>
+            {error && <p id={`${id}-error`} role="alert" className="text-xs text-red-600">{error}</p>}
+        </div>
+    );
 }

@@ -47,6 +47,8 @@ The seed command inserts the sample workouts without deleting or replacing exist
 
 The diet planner provides a separate meal plan for each Monday-through-Sunday selection; it opens on the current weekday and labels the selected day's meals. Swapping a meal updates only that day's plan. Older plans without stored alternatives receive a generated local option the first time a meal is swapped. The Spotify mood player is available only while signed in and stays mounted as a persistent player while navigating between application pages. Spotify playback itself is controlled by the embedded Spotify player and requires an internet connection.
 
+Diet preferences use working dropdown controls and regenerate the current week's plan when submitted. Generated fallback menus follow the selected diet (including non-vegetarian protein choices) and vary ingredients between weekdays. Food logs are saved against the selected weekday's calendar date, including snack meal types, and appear with that day's nutrition totals and entries.
+
 Start the API in the first PowerShell terminal:
 
 ```powershell

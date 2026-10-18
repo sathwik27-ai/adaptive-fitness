@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { selectCurrentUser } from '../features/authSlice';
-import { useGetStatsQuery, useGetInsightsQuery, useGetWorkoutsQuery, useRefreshStatsMutation, useSyncHealthMutation, useGetGoogleFitAuthQuery } from '../services/apiSlice';
+import { useGetStatsQuery, useGetInsightsQuery, useRefreshStatsMutation, useSyncHealthMutation, useLazyGetGoogleFitAuthQuery } from '../services/apiSlice';
 import StatCard from '../components/ui/StatCard';
 import Button from '../components/ui/Button';
-import SpotifyMood from '../components/SpotifyMood';
 import { Flame, Footprints, Clock, Trophy, Dumbbell, Bookmark, Sparkles, Brain, RefreshCcw, Activity } from 'lucide-react';
 import {
     ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -18,26 +18,37 @@ export default function Dashboard() {
     const { data: insightData } = useGetInsightsQuery();
     const [refreshStats, { isLoading: refreshing }] = useRefreshStatsMutation();
     const [syncHealth, { isLoading: syncing }] = useSyncHealthMutation();
-    const { data: authData } = useGetGoogleFitAuthQuery(undefined, { skip: !!user?.googleFitTokens?.refreshToken });
+    const [getGoogleFitAuth, { isFetching: connectingGoogleFit }] = useLazyGetGoogleFitAuthQuery();
 
     const stats = statsData?.stats || {};
     const insights = insightData?.insights || [];
 
-    const handleConnectGoogleFit = () => {
-        if (authData?.url) window.location.href = authData.url;
+    const handleConnectGoogleFit = async () => {
+        try {
+            const { url } = await getGoogleFitAuth().unwrap();
+            window.location.assign(url);
+        } catch (error) {
+            toast.error(error?.data?.message || 'Unable to start Google Fit connection.');
+        }
     };
 
-    // Today's Recommendation
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-    const todayPlan = user?.workoutPlan?.schedule?.[today];
-    const fitnessLevel = user?.profile?.fitnessLevel || 'beginner';
+    const handleSyncHealth = async () => {
+        try {
+            await syncHealth().unwrap();
+            toast.success('Google Fit data synced.');
+        } catch (error) {
+            toast.error(error?.data?.message || 'Unable to sync Google Fit data.');
+        }
+    };
 
-    const { data: recommendations } = useGetWorkoutsQuery({
-        type: todayPlan?.rest ? '' : todayPlan?.type || '',
-        level: fitnessLevel,
-    }, { skip: !todayPlan });
-
-    const recommendedWorkout = recommendations?.workouts?.[0];
+    const handleRefreshStats = async () => {
+        try {
+            await refreshStats().unwrap();
+            toast.success('Dashboard stats refreshed.');
+        } catch (error) {
+            toast.error(error?.data?.message || 'Unable to refresh dashboard stats.');
+        }
+    };
 
     useEffect(() => {
         // Refresh stats on first mount if they seem empty
@@ -58,12 +69,12 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {!user?.googleFitTokens?.refreshToken ? (
-                        <Button variant="green" size="sm" onClick={handleConnectGoogleFit} className="shadow-sm">
-                            <Activity size={16} className="mr-2" />
-                            Connect Google Fit
+                        <Button variant="green" size="sm" onClick={handleConnectGoogleFit} disabled={connectingGoogleFit} className="shadow-sm">
+                            <Activity size={16} className={`mr-2 ${connectingGoogleFit ? 'animate-pulse' : ''}`} />
+                            {connectingGoogleFit ? 'Connecting...' : 'Connect Google Fit'}
                         </Button>
                     ) : (
-                        <Button variant="outline" size="sm" onClick={() => syncHealth()} disabled={syncing} className="shadow-sm">
+                        <Button variant="outline" size="sm" onClick={handleSyncHealth} disabled={syncing} className="shadow-sm">
                             <RefreshCcw size={16} className={`mr-2 ${syncing ? 'animate-spin' : ''}`} />
                             Sync Health
                         </Button>
@@ -71,7 +82,7 @@ export default function Dashboard() {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => refreshStats()}
+                        onClick={handleRefreshStats}
                         disabled={refreshing}
                         className="w-fit"
                     >
@@ -115,12 +126,12 @@ export default function Dashboard() {
                 </div>
             </section>
 
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-8">
                 {/* Weekly Chart */}
-                <div className="lg:col-span-2 space-y-4">
+                <div className="min-w-0 space-y-4">
                     <h2 className="text-xl font-semibold text-primary">Biometric Performance</h2>
-                    <div className="bg-bg-card rounded-card shadow-card p-4 md:p-6 h-[320px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="bg-bg-card rounded-card shadow-card p-4 md:p-6 h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <ComposedChart data={stats.weeklyCalories || []}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E6DCCB" vertical={false} />
                                 <XAxis dataKey="day" tick={{ fill: '#6B6B6B', fontSize: 12 }} />
@@ -135,8 +146,6 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Spotify Mood Player */}
-                <SpotifyMood />
             </div>
 
             {/* Quick Actions Navigation */}

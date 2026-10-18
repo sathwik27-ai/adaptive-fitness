@@ -5,6 +5,7 @@ const variants = {
     ghost: 'border border-primary text-primary hover:bg-primary/10 focus-ring',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus-ring',
     green: 'bg-primary text-text-on-dark hover:bg-primary-hover focus-ring',
+    outline: 'border border-bg-surface text-text-primary hover:bg-bg-surface/60 focus-ring',
 };
 const sizes = {
     sm: 'px-3 py-1.5 text-sm',

@@ -72,7 +72,7 @@ export default function Landing() {
                     <div className="grid md:grid-cols-3 gap-8">
                         {features.map(({ icon: Icon, title, desc }) => (
                             <div key={title} className="bg-bg-card rounded-card shadow-card p-8 flex flex-col items-start gap-4 hover:shadow-lg transition-shadow">
-                                <div className="p-3 bg-primary/10 rounded-xl"><Icon size={26} className="text-primary" /></div>
+                                <div className="p-3 bg-primary/10 rounded-xl">{React.createElement(Icon, { size: 26, className: 'text-primary' })}</div>
                                 <h3 className="text-xl font-semibold text-cta">{title}</h3>
                                 <p className="text-text-secondary">{desc}</p>
                                 <div className="flex items-center gap-1 text-primary text-sm font-medium mt-auto">

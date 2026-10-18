@@ -19,6 +19,7 @@ const GOAL_TYPE_MAP = {
 
 export default function Workouts() {
     const user = useSelector(selectCurrentUser);
+    const profile = user?.profile;
     const [search, setSearch] = useState('');
     const [active, setActive] = useState('All');
     const [level, setLevel] = useState('All');
@@ -46,18 +47,18 @@ export default function Workouts() {
     }, [rawData, forYou, user?.profile]);
 
     const recommendedWorkouts = useMemo(() => {
-        if (!rawData?.workouts || !user?.profile) return [];
+        if (!rawData?.workouts || !profile) return [];
 
         return rawData.workouts.filter(w => {
-            const matchesLevel = w.level === user.profile.fitnessLevel;
-            const matchesGoal = GOAL_TYPE_MAP[user.profile.goal]?.includes(w.type);
-            const userEquip = user.profile.equipment?.map(e => e.toLowerCase()) || [];
+            const matchesLevel = w.level === profile.fitnessLevel;
+            const matchesGoal = GOAL_TYPE_MAP[profile.goal]?.includes(w.type);
+            const userEquip = profile.equipment?.map(e => e.toLowerCase()) || [];
             const matchesEquip = w.equipment?.length === 0 ||
                 w.equipment?.every(e => userEquip.includes(e.toLowerCase()));
 
             return matchesLevel && matchesGoal && matchesEquip;
         }).slice(0, 3);
-    }, [rawData, user?.profile]);
+    }, [rawData, profile]);
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">

@@ -4,8 +4,6 @@ import Badge from '../components/ui/Badge';
 import { Clock, Flame, Calendar, Dumbbell, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const levelColor = { beginner: 'green', intermediate: 'orange', advanced: 'purple' };
-
 export default function WorkoutHistory() {
     const { data, isLoading } = useGetWorkoutLogsQuery();
     const logs = data?.logs || [];

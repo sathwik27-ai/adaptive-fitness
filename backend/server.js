@@ -5,27 +5,40 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const passport = require('passport');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('./config/env').validateEnv();
+
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/error');
-require('dotenv').config();
+const setupHealthSync = require('./background/healthSync');
 
 // Passport config
 require('./config/passport');
 
-// Background Sync
-require('./background/healthSync')();
-
 const app = express();
-
-// Connect Database
-connectDB();
 
 // Security headers
 app.use(helmet());
 
-// CORS — whitelist frontend origin only
+const frontendOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigins = new Set([frontendOrigin]);
+if (process.env.NODE_ENV !== 'production') {
+  const localOrigin = new URL(frontendOrigin);
+  if (localOrigin.hostname === 'localhost') {
+    localOrigin.hostname = '127.0.0.1';
+    allowedOrigins.add(localOrigin.origin);
+  } else if (localOrigin.hostname === '127.0.0.1') {
+    localOrigin.hostname = 'localhost';
+    allowedOrigins.add(localOrigin.origin);
+  }
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(null, false);
+  },
   credentials: true,
 }));
 
@@ -62,5 +75,19 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 // Error handler (must be last)
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT} [${process.env.NODE_ENV}]`));
+const startServer = async () => {
+  await connectDB();
+  setupHealthSync();
+
+  const PORT = process.env.PORT || 5000;
+  return app.listen(PORT, () => console.log(`Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`));
+};
+
+if (require.main === module) {
+  startServer().catch((err) => {
+    console.error(`Server startup failed: ${err.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { app, startServer };

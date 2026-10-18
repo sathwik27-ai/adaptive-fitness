@@ -1,5 +1,8 @@
 const User = require('../models/User');
+const Meal = require('../models/Meal');
+const Workout = require('../models/Workout');
 const { generateWorkoutSchedule } = require('../utils/planGenerator');
+const mongoose = require('mongoose');
 
 // GET /api/users/me
 const getMe = async (req, res, next) => {
@@ -44,11 +47,41 @@ const updateMe = async (req, res, next) => {
 const toggleSaved = async (req, res, next) => {
     try {
         const { id, type } = req.body;
-        const user = await User.findById(req.user._id);
-        const field = type === 'meal' ? 'savedMeals' : 'savedWorkouts';
+        if (!mongoose.isValidObjectId(id) || !['workout', 'meal'].includes(type)) {
+            return res.status(400).json({ success: false, message: 'A valid item and saved type are required.' });
+        }
 
-        const idx = user[field].indexOf(id);
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+
+        const isMeal = type === 'meal';
+        const field = isMeal ? 'savedMeals' : 'savedWorkouts';
+        const Item = isMeal ? Meal : Workout;
+        const idx = user[field].findIndex((savedId) => savedId.equals(id));
         if (idx === -1) {
+            let item = await Item.findById(id).select('_id');
+            if (!item && isMeal) {
+                const { name, calories, protein, carbs, fats, ingredients, instructions } = req.body.meal || {};
+                if (typeof name !== 'string' || !name.trim()) {
+                    return res.status(400).json({ success: false, message: 'Meal details are required to save this meal.' });
+                }
+                item = await Meal.findOneAndUpdate(
+                    { _id: id },
+                    {
+                        $setOnInsert: {
+                            name: name.trim(),
+                            calories: Number(calories) || 0,
+                            protein: Number(protein) || 0,
+                            carbs: Number(carbs) || 0,
+                            fats: Number(fats) || 0,
+                            ingredients: Array.isArray(ingredients) ? ingredients.map(String) : [],
+                            instructions: typeof instructions === 'string' ? instructions : '',
+                        },
+                    },
+                    { upsert: true, returnDocument: 'after', runValidators: true },
+                ).select('_id');
+            }
+            if (!item) return res.status(404).json({ success: false, message: 'Workout not found.' });
             user[field].push(id);
         } else {
             user[field].splice(idx, 1);
@@ -61,4 +94,3 @@ const toggleSaved = async (req, res, next) => {
 };
 
 module.exports = { getMe, updateMe, toggleSaved };
-

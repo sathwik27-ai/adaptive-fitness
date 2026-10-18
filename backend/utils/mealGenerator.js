@@ -49,6 +49,30 @@ function calculateMacros(caloriesTarget, weightKg, goal) {
 // ─── Single Meal Generator ──────────────────────────
 const MEAL_TYPES = ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner'];
 const CALORIE_SPLIT = { breakfast: 0.25, morning_snack: 0.08, lunch: 0.30, afternoon_snack: 0.07, dinner: 0.30 };
+const ALTERNATIVE_MEALS = {
+    veg: ['Greek yogurt and berry bowl', 'Cottage cheese and fruit plate', 'Chickpea and grain bowl', 'Lentil and roasted vegetable plate', 'Paneer and spinach bowl'],
+    'non-veg': ['Egg and vegetable breakfast bowl', 'Turkey and fruit snack plate', 'Chicken and grain bowl', 'Tuna and avocado snack plate', 'Chicken and roasted vegetable plate'],
+    vegan: ['Tofu and berry breakfast bowl', 'Hummus and fruit snack plate', 'Chickpea and grain bowl', 'Edamame and vegetable snack plate', 'Lentil and roasted vegetable plate'],
+    keto: ['Egg and avocado breakfast bowl', 'Cheese and olive snack plate', 'Chicken and greens bowl', 'Avocado and seed snack plate', 'Salmon and roasted vegetable plate'],
+    paleo: ['Egg and fruit breakfast bowl', 'Turkey and fruit snack plate', 'Chicken and vegetable bowl', 'Nuts and berries snack plate', 'Salmon and roasted vegetable plate'],
+};
+
+const createAlternativeOption = (primary, mealType, dietType) => {
+    const mealTypeIndex = MEAL_TYPES.indexOf(mealType);
+    const alternatives = ALTERNATIVE_MEALS[dietType] || ALTERNATIVE_MEALS.veg;
+    const title = alternatives[mealTypeIndex] || alternatives[0];
+    const calories = Math.max(0, Math.round(primary.calories * 0.95));
+
+    return {
+        title: title === primary.title ? `${title} with vegetables` : title,
+        calories,
+        protein: Math.max(0, Math.round(primary.protein * 1.05)),
+        carbs: Math.max(0, Math.round(primary.carbs * 0.95)),
+        fats: Math.max(0, Math.round(primary.fats * 1.05)),
+        ingredients: [{ name: title.replace(/ bowl| plate/gi, ''), quantity: '1 serving' }],
+        instructions: 'Prepare the ingredients and serve as a balanced alternative meal.',
+    };
+};
 
 const generateSingleMeal = async (dietType, mealType, dailyCalorieTarget) => {
     const targetType = mealType.includes('snack') ? 'snacks' : mealType;
@@ -116,5 +140,5 @@ const generateMealPlan = async ({ dietType, region, dailyCalorieTarget = 2000 })
 module.exports = {
     calculateBMR, calculateTDEE, adjustCalories, calculateMacros,
     generateMealPlan, generateSingleMeal, generateWeeklyPlan,
-    MEAL_TYPES, CALORIE_SPLIT, ACTIVITY_MULTIPLIERS,
+    MEAL_TYPES, CALORIE_SPLIT, ACTIVITY_MULTIPLIERS, createAlternativeOption,
 };

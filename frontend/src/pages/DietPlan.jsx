@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
     useGenerateDietMutation, useGetDietQuery, useSwapMealMutation, useSaveDietMutation,
-    useLogFoodMutation, useGetFoodLogsQuery, useGetStatsQuery
+    useLogFoodMutation, useGetFoodLogsQuery
 } from '../services/apiSlice';
 import MealCard from '../components/ui/MealCard';
 import Button from '../components/ui/Button';
@@ -29,6 +30,7 @@ const dietSchema = z.object({
 });
 
 const MEAL_TYPES = ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner'];
+const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SECTION_LABELS = {
     breakfast: <span className="flex items-center gap-2 text-orange-600"><Coffee size={18} /> Breakfast</span>,
     morning_snack: <span className="flex items-center gap-2 text-yellow-600"><Apple size={18} /> Morning Snack</span>,
@@ -42,12 +44,12 @@ const PIE_COLORS = ['#2F5D3A', '#E59A3A', '#8C6FAE'];
 export default function DietPlan() {
     const { data: dietData, isLoading: dietLoading } = useGetDietQuery();
     const [generate, { isLoading: isGenerating }] = useGenerateDietMutation();
-    const [swapMeal] = useSwapMealMutation();
+    const [swapMeal, { isLoading: isSwapping }] = useSwapMealMutation();
     const [logFood] = useLogFoodMutation();
     const { data: logsData } = useGetFoodLogsQuery({});
-    const { data: statsData } = useGetStatsQuery();
 
-    const [activeDay, setActiveDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
+    const todayIndex = (new Date().getDay() + 6) % 7;
+    const [activeDay, setActiveDay] = useState(todayIndex);
     const [showForm, setShowForm] = useState(false);
     const [logEntry, setLogEntry] = useState({ mealType: 'breakfast', name: '', calories: '', protein: '', carbs: '', fats: '' });
 
@@ -66,30 +68,30 @@ export default function DietPlan() {
 
     const profile = dietData?.profile;
     const weeklyPlan = profile?.weeklyPlan || [];
-    const currentDayPlan = weeklyPlan && activeDay >= 0 && activeDay < weeklyPlan.length ? weeklyPlan[activeDay] : null;
+    const selectedDayName = WEEK_DAYS[activeDay];
+    const currentDayPlan = weeklyPlan.find((day) => day.day?.toLowerCase() === selectedDayName?.toLowerCase())
+        || weeklyPlan[activeDay]
+        || null;
+    const currentDayIndex = currentDayPlan ? weeklyPlan.indexOf(currentDayPlan) : -1;
     const target = profile?.dailyCalorieTarget || 2000;
 
     const todayLog = logsData?.logs?.[0]; // Assume today's log is first
     const consumed = todayLog?.totalCalories || 0;
-    const actualMacros = {
-        protein: todayLog?.totalProtein || 0,
-        carbs: todayLog?.totalCarbs || 0,
-        fats: todayLog?.totalFats || 0
-    };
+    const actualProtein = todayLog?.totalProtein || 0;
+    const actualCarbs = todayLog?.totalCarbs || 0;
+    const actualFats = todayLog?.totalFats || 0;
 
     const macroCompareData = useMemo(() => {
         if (!profile?.macroTargets) return [];
         const { protein, carbs, fats } = profile.macroTargets;
         return [
-            { name: 'Protein', target: protein, actual: actualMacros.protein },
-            { name: 'Carbs', target: carbs, actual: actualMacros.carbs },
-            { name: 'Fats', target: fats, actual: actualMacros.fats },
+            { name: 'Protein', target: protein, actual: actualProtein },
+            { name: 'Carbs', target: carbs, actual: actualCarbs },
+            { name: 'Fats', target: fats, actual: actualFats },
         ];
-    }, [profile, actualMacros]);
+    }, [profile, actualProtein, actualCarbs, actualFats]);
 
-    useEffect(() => {
-        if (!dietLoading && !profile) setShowForm(true);
-    }, [dietLoading, profile]);
+    const showDietForm = showForm || (!dietLoading && !profile);
 
     const onSubmit = async (data) => {
         try {
@@ -105,12 +107,13 @@ export default function DietPlan() {
         const meal = currentDayPlan.meals[mealIndex];
         const currentIdx = meal.selectedOptionIndex || 0;
         const totalOptions = (meal.alternativeOptions?.length || 0) + 1;
-        const nextIndex = (currentIdx + 1) % totalOptions;
+        const nextIndex = totalOptions === 1 ? 1 : (currentIdx + 1) % totalOptions;
 
         try {
-            await swapMeal({ dayIndex: activeDay, mealIndex, selectedOptionIndex: nextIndex }).unwrap();
-        } catch (err) {
-            console.error('Swap failed', err);
+            await swapMeal({ dayIndex: currentDayIndex, mealIndex, selectedOptionIndex: nextIndex }).unwrap();
+            toast.success('Meal option updated.');
+        } catch (error) {
+            toast.error(error?.data?.message || 'Could not swap this meal.');
         }
     };
 
@@ -159,8 +162,8 @@ export default function DietPlan() {
                             {profile.saved ? 'Plan Saved' : 'Save Current Plan'}
                         </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
-                        {showForm ? 'View Plan' : 'Update Preferences'}
+                    <Button variant="outline" size="sm" onClick={() => setShowForm(!showDietForm)}>
+                        {showDietForm ? 'View Plan' : 'Update Preferences'}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => window.print()}>
                         <Download size={16} className="mr-2" /> PDF Export
@@ -168,7 +171,7 @@ export default function DietPlan() {
                 </div>
             </div>
 
-            {showForm ? (
+            {showDietForm ? (
                 <div className="bg-bg-card rounded-card shadow-card p-6 md:p-10 border border-primary/10 animate-in fade-in zoom-in-95 duration-300">
                     <h2 className="text-xl font-bold text-primary mb-6 flex items-center gap-2">
                         <Sparkles size={20} /> Tailor Your Diet
@@ -275,16 +278,29 @@ export default function DietPlan() {
 
                     {/* 7-Day Weekly Navigator */}
                     <div className="space-y-6">
-                        <div className="flex justify-between items-center px-1">
-                            <h2 className="text-xl font-black text-primary flex items-center gap-2 tracking-tight">
-                                <Calendar size={20} /> Weekly Nutrition Path
-                            </h2>
-                            <div className="flex gap-1">
-                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
-                                    <button key={i} onClick={() => setActiveDay(i)}
-                                        className={`w-10 h-10 rounded-xl font-bold transition-all text-sm
-                                        ${activeDay === i ? 'bg-primary text-white shadow-primary/30 shadow-lg scale-110' : 'bg-bg-card hover:bg-bg-surface text-text-muted border border-bg-surface'}`}>
-                                        {day}
+                        <div className="flex flex-col gap-4 px-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h2 className="text-xl font-black text-primary flex items-center gap-2 tracking-tight">
+                                    <Calendar size={20} /> Weekly Nutrition Path
+                                </h2>
+                                {currentDayPlan && (
+                                    <p className="mt-1 text-sm font-medium text-text-secondary">
+                                        Showing {currentDayPlan.day || selectedDayName}'s meals
+                                    </p>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                                {WEEK_DAYS.map((day, i) => (
+                                    <button
+                                        key={day}
+                                        type="button"
+                                        onClick={() => setActiveDay(i)}
+                                        aria-pressed={activeDay === i}
+                                        aria-label={`Show ${day} meal plan`}
+                                        className={`min-h-11 rounded-xl px-3 text-sm font-bold transition-all
+                                            ${activeDay === i ? 'bg-primary text-white shadow-primary/30 shadow-lg' : 'bg-bg-card hover:bg-bg-surface text-text-muted border border-bg-surface'}`}
+                                    >
+                                        {day.slice(0, 3)}
                                     </button>
                                 ))}
                             </div>
@@ -326,7 +342,7 @@ export default function DietPlan() {
                                             <MealCard
                                                 meal={mealDisplay}
                                                 onSwap={() => handleSwap(idx)}
-                                                mealType={type}
+                                                isSwapping={isSwapping}
                                             />
                                         </div>
                                     );

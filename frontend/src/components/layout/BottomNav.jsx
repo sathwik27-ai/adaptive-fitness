@@ -27,7 +27,7 @@ export default function BottomNav() {
                             }
                             aria-label={label}
                         >
-                            <Icon size={22} />
+                            {React.createElement(Icon, { size: 22 })}
                             <span className="text-[10px] font-medium">{label}</span>
                         </NavLink>
                     </li>

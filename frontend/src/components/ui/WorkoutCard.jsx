@@ -1,20 +1,25 @@
 import React from 'react';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useToggleSavedMutation } from '../../services/apiSlice';
 import Badge from './Badge';
 import Button from './Button';
+import toast from 'react-hot-toast';
 import { Bookmark, BookmarkCheck, Clock, Dumbbell, Flame } from 'lucide-react';
 
 const levelColor = { beginner: 'green', intermediate: 'orange', advanced: 'purple' };
 
-export default function WorkoutCard({ workout, onStart, isSaved = false }) {
+export default function WorkoutCard({ workout, isSaved = false }) {
     const navigate = useNavigate();
-    const [toggleSaved] = useToggleSavedMutation();
+    const [toggleSaved, { isLoading: saving }] = useToggleSavedMutation();
 
     const handleSave = async (e) => {
         e.stopPropagation();
-        await toggleSaved({ type: 'workout', id: workout._id });
+        try {
+            await toggleSaved({ type: 'workout', id: workout._id }).unwrap();
+            toast.success(isSaved ? 'Workout removed from saved.' : 'Workout saved.');
+        } catch (error) {
+            toast.error(error?.data?.message || 'Could not update saved workouts.');
+        }
     };
 
     const handleClick = () => {
@@ -23,22 +28,7 @@ export default function WorkoutCard({ workout, onStart, isSaved = false }) {
 
     const handleStart = (e) => {
         e.stopPropagation();
-        const defaultMins = workout.duration || 30;
-        const input = prompt(`Enter preferred workout duration in minutes (5-120):`, defaultMins);
-
-        if (input === null) return; // User cancelled
-
-        let mins = parseInt(input);
-        if (isNaN(mins) || input.trim() === "") {
-            mins = defaultMins;
-        }
-
-        if (mins < 5 || mins > 120) {
-            alert("Please enter a duration between 5 and 120 minutes.");
-            return;
-        }
-
-        navigate(`/workouts/${workout._id}`, { state: { autoStart: true, customDuration: mins } });
+        navigate(`/workouts/${workout._id}`, { state: { autoStart: true, customDuration: workout.duration || 30 } });
     };
 
     return (
@@ -57,8 +47,9 @@ export default function WorkoutCard({ workout, onStart, isSaved = false }) {
                 />
                 <button
                     onClick={handleSave}
+                    disabled={saving}
                     aria-label={isSaved ? 'Remove bookmark' : 'Save workout'}
-                    className="absolute top-2 right-2 p-2 rounded-full bg-bg-card/80 hover:bg-bg-card transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="absolute top-2 right-2 p-2 rounded-full bg-bg-card/80 hover:bg-bg-card transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                 >
                     {isSaved
                         ? <BookmarkCheck size={18} className="text-primary" />

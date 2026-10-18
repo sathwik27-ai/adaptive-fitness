@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const Workout = require('../models/Workout');
 
@@ -252,13 +253,26 @@ const workouts = [
 ];
 
 const seedWorkouts = async () => {
-    await mongoose.connect(process.env.MONGO_URI);
+    const mongoURI = process.env.MONGO_URI || process.env.MONGODB_URI;
+    if (!mongoURI) {
+        throw new Error('Set MONGO_URI (or MONGODB_URI) in backend/.env before seeding.');
+    }
+
+    await mongoose.connect(mongoURI);
     console.log('Connected to MongoDB...');
-    await Workout.deleteMany({});
-    console.log('Cleared existing workouts...');
-    const created = await Workout.insertMany(workouts);
-    console.log(`✅ Seeded ${created.length} workouts successfully!`);
-    await mongoose.disconnect();
+    const result = await Workout.bulkWrite(workouts.map((workout) => ({
+        updateOne: {
+            filter: { title: workout.title },
+            update: { $setOnInsert: workout },
+            upsert: true,
+        },
+    })));
+    console.log(`Seeded ${result.upsertedCount} new workouts; kept ${workouts.length - result.upsertedCount} existing workouts.`);
 };
 
-seedWorkouts().catch(err => { console.error(err); process.exit(1); });
+seedWorkouts()
+    .catch((err) => {
+        console.error(`Workout seeding failed: ${err.message}`);
+        process.exitCode = 1;
+    })
+    .finally(() => mongoose.disconnect());

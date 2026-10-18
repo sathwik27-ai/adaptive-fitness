@@ -1,20 +1,21 @@
 import React, { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { setCredentials } from '../../features/authSlice';
+import { setCredentials, setInitialized } from '../../features/authSlice';
 import { useGetMeQuery } from '../../services/apiSlice';
 
-// Silently fetch user on app load if a session cookie exists
 export default function AuthInitializer({ children }) {
     const dispatch = useDispatch();
-    const { data, isSuccess } = useGetMeQuery(undefined, {
-        // Skip if cookie is not present (will fail silently)
-    });
+    const { data, isSuccess, isLoading, isFetching } = useGetMeQuery();
 
     useEffect(() => {
+        if (isLoading || isFetching) return;
+
         if (isSuccess && data?.user) {
             dispatch(setCredentials(data.user));
+        } else {
+            dispatch(setInitialized());
         }
-    }, [isSuccess, data, dispatch]);
+    }, [isSuccess, isLoading, isFetching, data, dispatch]);
 
     return children;
 }

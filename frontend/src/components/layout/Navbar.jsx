@@ -83,9 +83,11 @@ export default function Navbar() {
                                     <NavLink to="/history" role="menuitem" onClick={() => setDropOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-bg-secondary transition">
                                         <History size={16} /> Workout History
                                     </NavLink>
-                                    <NavLink to="/admin/workouts" role="menuitem" onClick={() => setDropOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-bg-secondary transition">
-                                        <Activity size={16} /> Admin Upload
-                                    </NavLink>
+                                    {user.role === 'admin' && (
+                                        <NavLink to="/admin/workouts" role="menuitem" onClick={() => setDropOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-bg-secondary transition">
+                                            <Activity size={16} /> Admin Upload
+                                        </NavLink>
+                                    )}
                                     <button onClick={handleLogout} role="menuitem" className="w-full flex items-center gap-2 px-4 py-3 text-sm hover:bg-bg-secondary transition text-left">
                                         <LogOut size={16} /> Logout
                                     </button>

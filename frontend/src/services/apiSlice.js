@@ -1,13 +1,25 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { clearCredentials } from '../features/authSlice';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+    || `${window.location.protocol}//${window.location.hostname}:5000/api`;
+
+const rawBaseQuery = fetchBaseQuery({
+    baseUrl: API_BASE_URL,
+    credentials: 'include',
+});
+
+const baseQuery = async (args, api, extraOptions) => {
+    const result = await rawBaseQuery(args, api, extraOptions);
+    if (result.error?.status === 401) {
+        api.dispatch(clearCredentials());
+    }
+    return result;
+};
 
 export const apiSlice = createApi({
     reducerPath: 'api',
-    baseQuery: fetchBaseQuery({
-        baseUrl: BASE_URL,
-        credentials: 'include', // Send HTTP-only cookies
-    }),
+    baseQuery,
     tagTypes: ['User', 'Workouts', 'WorkoutLogs', 'Diet', 'FoodLogs', 'Progress', 'PostureLogs', 'Stats'],
     endpoints: (builder) => ({
         // Auth
@@ -23,7 +35,7 @@ export const apiSlice = createApi({
         // Workouts
         getWorkouts: builder.query({ query: (params) => ({ url: '/workouts', params }), providesTags: ['Workouts'] }),
         getWorkout: builder.query({ query: (id) => `/workouts/${id}` }),
-        logWorkout: builder.mutation({ query: (body) => ({ url: '/workouts/log', method: 'POST', body }), invalidatesTags: ['WorkoutLogs', 'Progress'] }),
+        logWorkout: builder.mutation({ query: (body) => ({ url: '/workouts/log', method: 'POST', body }), invalidatesTags: ['WorkoutLogs', 'Progress', 'Stats', 'User'] }),
         getWorkoutLogs: builder.query({ query: () => '/workouts/logs', providesTags: ['WorkoutLogs'] }),
         createWorkout: builder.mutation({
             query: (formData) => ({ url: '/workouts', method: 'POST', body: formData }),
@@ -44,7 +56,7 @@ export const apiSlice = createApi({
 
         // Progress
         getProgress: builder.query({ query: (params) => ({ url: '/progress', params }), providesTags: ['Progress'] }),
-        addProgress: builder.mutation({ query: (body) => ({ url: '/progress', method: 'POST', body }), invalidatesTags: ['Progress'] }),
+        addProgress: builder.mutation({ query: (body) => ({ url: '/progress', method: 'POST', body }), invalidatesTags: ['Progress', 'Stats'] }),
 
         // Posture
         savePostureSession: builder.mutation({ query: (body) => ({ url: '/posture/session', method: 'POST', body }), invalidatesTags: ['PostureLogs', 'User', 'Stats'] }),
@@ -70,6 +82,5 @@ export const {
     useGetProgressQuery, useAddProgressMutation,
     useSavePostureSessionMutation, useGetPostureHistoryQuery,
     useGetStatsQuery, useGetInsightsQuery, useRefreshStatsMutation,
-    useGetGoogleFitAuthQuery, useSyncHealthMutation,
+    useGetGoogleFitAuthQuery, useLazyGetGoogleFitAuthQuery, useSyncHealthMutation,
 } = apiSlice;
-

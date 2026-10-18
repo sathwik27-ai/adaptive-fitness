@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
+import { useDispatch } from 'react-redux';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useUpdateMeMutation } from '../services/apiSlice';
-import { setCredentials, selectCurrentUser } from '../features/authSlice';
+import { setCredentials } from '../features/authSlice';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import ProgressBar from '../components/ui/ProgressBar';
@@ -24,13 +24,13 @@ const LEVELS = ['beginner', 'intermediate', 'advanced'];
 export default function Onboarding() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const user = useSelector(selectCurrentUser);
     const [updateMe] = useUpdateMeMutation();
 
     const [step, setStep] = useState(0);
     const [formData, setFormData] = useState({});
     const [equipment, setEquipment] = useState([]);
     const [done, setDone] = useState(false);
+    const [submitError, setSubmitError] = useState('');
 
     const schema = [
         z.object({ age: z.coerce.number().min(13).max(100), gender: z.enum(['male', 'female', 'non-binary', 'prefer-not']) }),
@@ -39,7 +39,12 @@ export default function Onboarding() {
         z.object({ location: z.enum(['home', 'gym']), timePerWorkout: z.coerce.number().min(10).max(180) }),
     ][step];
 
-    const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm({ resolver: zodResolver(schema) });
+    const { control, register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) });
+    const selectedGender = useWatch({ control, name: 'gender' });
+    const selectedGoal = useWatch({ control, name: 'goal' });
+    const selectedFitnessLevel = useWatch({ control, name: 'fitnessLevel' });
+    const selectedLocation = useWatch({ control, name: 'location' });
+    const workoutDuration = useWatch({ control, name: 'timePerWorkout' });
 
     const onNext = async (data) => {
         const merged = { ...formData, ...data };
@@ -60,7 +65,12 @@ export default function Onboarding() {
             }).unwrap();
             dispatch(setCredentials(res.user));
             setDone(true);
-        } catch { }
+        } catch (err) {
+            const message = typeof err?.data === 'string'
+                ? err.data
+                : err?.data?.message;
+            setSubmitError(message || 'Could not save onboarding. Please try again.');
+        }
     };
 
     const toggleEquipment = (item) =>
@@ -83,8 +93,6 @@ export default function Onboarding() {
         );
     }
 
-    const progress = ((step) / steps.length) * 100;
-
     return (
         <div className="min-h-screen bg-bg-main flex flex-col items-center justify-center px-4 py-12">
             <div className="w-full max-w-lg">
@@ -100,6 +108,7 @@ export default function Onboarding() {
                 </div>
 
                 <div className="bg-bg-card rounded-card shadow-card p-8">
+                    {submitError && <p role="alert" className="text-sm text-red-700">{submitError}</p>}
                     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
                         {/* Step 1: Personal Info */}
                         {step === 0 && (
@@ -111,7 +120,7 @@ export default function Onboarding() {
                                     <div className="grid grid-cols-2 gap-2">
                                         {GENDERS.map(g => (
                                             <label key={g} className={`flex items-center gap-2 p-3 rounded-btn border cursor-pointer transition
-                        ${watch('gender') === g ? 'border-primary bg-primary/5' : 'border-bg-surface hover:border-accent-light'}`}>
+                        ${selectedGender === g ? 'border-primary bg-primary/5' : 'border-bg-surface hover:border-accent-light'}`}>
                                                 <input type="radio" value={g} {...register('gender')} className="accent-primary" />
                                                 <span className="text-sm capitalize text-text-primary">{g.replace('-', ' ')}</span>
                                             </label>
@@ -141,7 +150,7 @@ export default function Onboarding() {
                                     <div className="grid grid-cols-2 gap-2">
                                         {GOALS.map(g => (
                                             <label key={g} className={`flex items-center gap-2 p-3 rounded-btn border cursor-pointer transition
-                        ${watch('goal') === g ? 'border-primary bg-primary/5' : 'border-bg-surface hover:border-accent-light'}`}>
+                        ${selectedGoal === g ? 'border-primary bg-primary/5' : 'border-bg-surface hover:border-accent-light'}`}>
                                                 <input type="radio" value={g} {...register('goal')} className="accent-primary" />
                                                 <span className="text-sm capitalize text-text-primary">{g.replace('-', ' ')}</span>
                                             </label>
@@ -155,7 +164,7 @@ export default function Onboarding() {
                                     <div className="grid grid-cols-3 gap-2">
                                         {LEVELS.map(l => (
                                             <label key={l} className={`flex items-center justify-center p-3 rounded-btn border cursor-pointer transition
-                        ${watch('fitnessLevel') === l ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-bg-surface hover:border-accent-light text-text-secondary'}`}>
+                        ${selectedFitnessLevel === l ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-bg-surface hover:border-accent-light text-text-secondary'}`}>
                                                 <input type="radio" value={l} {...register('fitnessLevel')} className="sr-only" />
                                                 <span className="text-sm capitalize">{l}</span>
                                             </label>
@@ -175,7 +184,7 @@ export default function Onboarding() {
                                     <div className="grid grid-cols-2 gap-2">
                                         {['home', 'gym'].map(loc => (
                                             <label key={loc} className={`flex items-center justify-center p-3 rounded-btn border cursor-pointer transition text-sm
-                        ${watch('location') === loc ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-bg-surface hover:border-accent-light text-text-secondary'}`}>
+                        ${selectedLocation === loc ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-bg-surface hover:border-accent-light text-text-secondary'}`}>
                                                 <input type="radio" value={loc} {...register('location')} className="sr-only" />
                                                 <span className="capitalize">{loc}</span>
                                             </label>
@@ -202,7 +211,7 @@ export default function Onboarding() {
 
                                 <div className="flex flex-col gap-2">
                                     <label className="text-sm font-medium text-text-secondary">
-                                        Time per workout: <span className="text-primary font-semibold">{watch('timePerWorkout') || 30} min</span>
+                                        Time per workout: <span className="text-primary font-semibold">{workoutDuration || 30} min</span>
                                     </label>
                                     <input type="range" min={10} max={120} step={5}
                                         className="accent-primary w-full"

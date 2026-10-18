@@ -4,14 +4,20 @@ import Badge from './Badge';
 import Button from './Button';
 import { ChevronDown, ChevronUp, RefreshCw, Bookmark, BookmarkCheck } from 'lucide-react';
 import { useToggleSavedMutation } from '../../services/apiSlice';
+import toast from 'react-hot-toast';
 
-export default function MealCard({ meal, onSwap, mealType, isSaved = false }) {
+export default function MealCard({ meal, onSwap, isSaved = false, isSwapping = false }) {
     const [expanded, setExpanded] = useState(false);
-    const [toggleSaved] = useToggleSavedMutation();
+    const [toggleSaved, { isLoading: saving }] = useToggleSavedMutation();
 
     const handleSave = async (e) => {
         e.stopPropagation();
-        await toggleSaved({ type: 'meal', id: meal._id });
+        try {
+            await toggleSaved({ type: 'meal', id: meal._id, meal }).unwrap();
+            toast.success(isSaved ? 'Meal removed from saved.' : 'Meal saved.');
+        } catch (error) {
+            toast.error(error?.data?.message || 'Could not update saved meals.');
+        }
     };
 
     return (
@@ -24,14 +30,15 @@ export default function MealCard({ meal, onSwap, mealType, isSaved = false }) {
                 <div className="flex items-center gap-1">
                     <button
                         onClick={handleSave}
+                        disabled={saving}
                         className="p-1.5 rounded-full hover:bg-bg-surface transition text-cta"
                         aria-label={isSaved ? "Remove from saved" : "Save meal"}
                     >
                         {isSaved ? <BookmarkCheck size={18} className="text-primary" /> : <Bookmark size={18} className="text-text-muted" />}
                     </button>
                     {onSwap && (
-                        <Button variant="ghost" size="sm" onClick={onSwap} aria-label="Swap this meal">
-                            <RefreshCw size={14} /> Swap
+                        <Button variant="ghost" size="sm" onClick={onSwap} disabled={isSwapping} aria-label="Swap this meal">
+                            <RefreshCw size={14} className={isSwapping ? 'animate-spin' : ''} /> {isSwapping ? 'Swapping...' : 'Swap'}
                         </Button>
                     )}
                 </div>

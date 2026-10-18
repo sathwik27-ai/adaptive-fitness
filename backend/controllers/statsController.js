@@ -41,8 +41,8 @@ const getStats = async (req, res, next) => {
 // GET /api/stats/insights — Generate AI fitness insights
 const getInsights = async (req, res, next) => {
     try {
-        const stats = await UserStats.findOne({ userId: req.user._id });
-        if (!stats) return res.status(404).json({ success: false, message: 'No stats found. log some activity first.' });
+        const stats = await UserStats.findOne({ userId: req.user._id })
+            || await StatsService.recalculateAll(req.user._id);
 
         // Check cache (1 hour)
         if (stats.aiInsightCache?.timestamp && (new Date() - stats.aiInsightCache.timestamp < 3600000)) {

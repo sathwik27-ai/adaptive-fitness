@@ -2,6 +2,7 @@ const Workout = require('../models/Workout');
 const WorkoutLog = require('../models/WorkoutLog');
 const { uploadToCloudinary } = require('../middleware/upload');
 const StatsService = require('../services/StatsService');
+const mongoose = require('mongoose');
 
 // GET /api/workouts — list with filters
 const getWorkouts = async (req, res, next) => {
@@ -103,6 +104,15 @@ const deleteWorkout = async (req, res, next) => {
 const logWorkout = async (req, res, next) => {
     try {
         const { workoutId, durationMins, caloriesBurned, exercises, notes } = req.body;
+        if (!mongoose.isValidObjectId(workoutId)) {
+            return res.status(400).json({ success: false, message: 'A valid workout is required.' });
+        }
+        if (!Number.isFinite(Number(durationMins)) || Number(durationMins) < 1 || Number(durationMins) > 120) {
+            return res.status(400).json({ success: false, message: 'Workout duration must be between 1 and 120 minutes.' });
+        }
+        const workoutExists = await Workout.exists({ _id: workoutId });
+        if (!workoutExists) return res.status(404).json({ success: false, message: 'Workout not found.' });
+
         const log = await WorkoutLog.create({
             userId: req.user._id,
             workoutId,
@@ -133,4 +143,3 @@ const logWorkout = async (req, res, next) => {
 };
 
 module.exports = { getWorkouts, getWorkoutById, getWorkoutLogs, logWorkout, createWorkout, updateWorkout, deleteWorkout };
-

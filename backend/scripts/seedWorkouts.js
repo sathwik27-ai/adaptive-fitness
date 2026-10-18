@@ -1,6 +1,7 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const Workout = require('../models/Workout');
-require('dotenv').config();
 
 const workouts = [
     {
@@ -186,21 +187,25 @@ const workouts = [
 ];
 
 const seedDB = async () => {
-    try {
-        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/webathon_db');
-        console.log('Connected to MongoDB');
-
-        // Clear existing workouts before seeding to avoid duplicates
-        await Workout.deleteMany({});
-        console.log('Cleared existing workouts');
-
-        await Workout.insertMany(workouts);
-        console.log('Successfully seeded workouts!');
-        process.exit();
-    } catch (err) {
-        console.error('Error seeding database:', err);
-        process.exit(1);
+    const mongoURI = process.env.MONGO_URI?.trim() || process.env.MONGODB_URI?.trim();
+    if (!mongoURI) {
+        throw new Error('Set MONGO_URI (or MONGODB_URI) in backend/.env before seeding.');
     }
+
+    await mongoose.connect(mongoURI);
+    const result = await Workout.bulkWrite(workouts.map((workout) => ({
+        updateOne: {
+            filter: { title: workout.title },
+            update: { $setOnInsert: workout },
+            upsert: true,
+        },
+    })));
+    console.log(`Seeded ${result.upsertedCount} new workouts; kept ${workouts.length - result.upsertedCount} existing workouts.`);
 };
 
-seedDB();
+seedDB()
+    .catch((err) => {
+        console.error(`Workout seeding failed: ${err.message}`);
+        process.exitCode = 1;
+    })
+    .finally(() => mongoose.disconnect());

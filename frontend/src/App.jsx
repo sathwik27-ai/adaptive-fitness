@@ -2,11 +2,14 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './app/store';
+import { selectIsAuthenticated } from './features/authSlice';
 import Navbar from './components/layout/Navbar';
 import BottomNav from './components/layout/BottomNav';
+import SpotifyMood from './components/SpotifyMood';
 import { Toaster } from 'react-hot-toast';
-import { ProtectedRoute, OnboardingGuard } from './components/layout/AuthGuard';
+import { ProtectedRoute, OnboardingGuard, AdminRoute } from './components/layout/AuthGuard';
 import AuthInitializer from './components/layout/AuthInitializer';
+import { useSelector } from 'react-redux';
 
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -53,7 +56,9 @@ export default function App() {
                   <Route path="/progress" element={<Progress />} />
                   <Route path="/saved" element={<Saved />} />
                   <Route path="/profile" element={<Profile />} />
-                  <Route path="/admin/workouts" element={<AdminWorkout />} />
+                  <Route element={<AdminRoute />}>
+                    <Route path="/admin/workouts" element={<AdminWorkout />} />
+                  </Route>
                   <Route path="/history" element={<WorkoutHistory />} />
                   <Route path="/posture" element={
                     <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh] text-text-muted">Loading Posture Detection…</div>}>
@@ -66,11 +71,23 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
+            <PersistentSpotifyPlayer />
             <BottomNav />
             <Toaster position="top-right" />
           </div>
         </AuthInitializer>
       </BrowserRouter>
     </Provider>
+  );
+}
+
+function PersistentSpotifyPlayer() {
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  if (!isAuthenticated) return null;
+
+  return (
+    <div className="fixed bottom-20 right-3 z-30 w-[min(22rem,calc(100vw-1.5rem))] md:bottom-4 md:right-4">
+      <SpotifyMood />
+    </div>
   );
 }

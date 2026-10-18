@@ -8,7 +8,7 @@ const TABS = ['Workouts', 'Meals'];
 
 export default function Saved() {
     const [activeTab, setActiveTab] = useState('Workouts');
-    const { data } = useGetMeQuery();
+    const { data, isLoading, isError } = useGetMeQuery();
     const user = data?.user;
     const savedWorkouts = user?.savedWorkouts || [];
 
@@ -31,7 +31,11 @@ export default function Saved() {
             {/* Workouts tab */}
             {activeTab === 'Workouts' && (
                 <div role="tabpanel">
-                    {savedWorkouts.length > 0 ? (
+                    {isLoading ? (
+                        <p className="py-12 text-center text-text-muted">Loading saved items...</p>
+                    ) : isError ? (
+                        <p role="alert" className="py-12 text-center text-red-700">Could not load saved items. Please refresh the page.</p>
+                    ) : savedWorkouts.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {savedWorkouts.map(workout => (
                                 <WorkoutCard key={workout._id} workout={workout} isSaved />
@@ -46,7 +50,11 @@ export default function Saved() {
             {/* Meals tab */}
             {activeTab === 'Meals' && (
                 <div role="tabpanel">
-                    {(user?.savedMeals || []).length === 0 ? (
+                    {isLoading ? (
+                        <p className="py-12 text-center text-text-muted">Loading saved items...</p>
+                    ) : isError ? (
+                        <p role="alert" className="py-12 text-center text-red-700">Could not load saved items. Please refresh the page.</p>
+                    ) : (user?.savedMeals || []).length === 0 ? (
                         <EmptyState label="meals" />
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

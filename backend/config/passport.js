@@ -16,6 +16,7 @@ passport.use(new JwtStrategy(
     {
         jwtFromRequest: cookieExtractor,
         secretOrKey: process.env.JWT_SECRET,
+        algorithms: ['HS256'],
     },
     async (payload, done) => {
         try {

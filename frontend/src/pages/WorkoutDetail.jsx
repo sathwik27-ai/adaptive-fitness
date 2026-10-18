@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useGetWorkoutQuery, useLogWorkoutMutation } from '../services/apiSlice';
 import Badge from '../components/ui/Badge';
@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import SessionTimer from '../components/workout/SessionTimer';
 import Modal from '../components/ui/Modal';
 import { ArrowLeft, Clock, Dumbbell, CheckCircle2, AlertTriangle, Play, Sparkles } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const levelColor = { beginner: 'green', intermediate: 'orange', advanced: 'purple' };
 
@@ -16,59 +17,57 @@ export default function WorkoutDetail() {
     const { data, isLoading, isError } = useGetWorkoutQuery(id);
     const [logWorkout] = useLogWorkoutMutation();
     const [sessionActive, setSessionActive] = useState(false);
+    const [timerAutoStart, setTimerAutoStart] = useState(false);
     const [doneModal, setDoneModal] = useState(false);
     const [sessionDuration, setSessionDuration] = useState(null);
     const [remainingSeconds, setRemainingSeconds] = useState(0);
+    const completionPending = useRef(false);
 
     const workout = data?.workout;
 
     React.useEffect(() => {
         if (location.state?.autoStart) {
-            setSessionDuration(location.state.customDuration);
+            const duration = location.state.customDuration || workout?.duration || 30;
+            setSessionDuration(duration);
+            setRemainingSeconds(duration * 60);
+            setTimerAutoStart(true);
             setSessionActive(true);
             // Clear state to avoid re-triggering on refresh
             window.history.replaceState({}, document.title);
         }
-    }, [location.state]);
+    }, [location.state, workout?.duration]);
 
     const handleStartWorkout = () => {
-        const defaultMins = workout?.duration || 30;
-        const input = prompt(`Enter preferred workout duration in minutes (5-120):`, defaultMins);
-
-        if (input === null) return; // User cancelled prompt
-
-        let mins = parseInt(input);
-        if (isNaN(mins) || input.trim() === "") {
-            mins = defaultMins;
-        }
-
-        if (mins < 5 || mins > 120) {
-            alert("Please enter a duration between 5 and 120 minutes.");
-            return;
-        }
-
-        setSessionDuration(mins);
+        setSessionDuration(workout?.duration || 30);
+        setRemainingSeconds((workout?.duration || 30) * 60);
+        setTimerAutoStart(true);
         setSessionActive(true);
     };
 
     const handleComplete = async () => {
+        if (completionPending.current) return;
+        completionPending.current = true;
         try {
             const activeDuration = sessionDuration || workout?.duration || 30;
             const totalSeconds = activeDuration * 60;
             const elapsedSeconds = totalSeconds - remainingSeconds;
             const actualDurationMins = Math.floor(elapsedSeconds / 60);
-
-            // Save actual duration (minimum 1 min if they spent any time)
-            const durationToSave = elapsedSeconds > 0 ? Math.max(1, actualDurationMins) : 0;
+            const durationToSave = Math.max(1, actualDurationMins);
 
             await logWorkout({
                 workoutId: id,
                 durationMins: durationToSave,
                 caloriesBurned: Math.floor(durationToSave * 8),
             }).unwrap();
-        } catch { }
-        setSessionActive(false);
-        setDoneModal(true);
+            setSessionActive(false);
+            setDoneModal(true);
+            toast.success('Workout saved to your progress.');
+        } catch (err) {
+            toast.error(err?.data?.message || 'Workout could not be saved. Please try ending the session again.');
+            setSessionActive(false);
+        } finally {
+            completionPending.current = false;
+        }
     };
 
     if (isLoading) return (
@@ -127,6 +126,7 @@ export default function WorkoutDetail() {
                     <h2 className="text-lg font-semibold text-primary">Session In Progress</h2>
                     <SessionTimer
                         duration={sessionDuration || workout.duration}
+                        autoStart={timerAutoStart}
                         onComplete={handleComplete}
                         onTick={(secs) => setRemainingSeconds(secs)}
                     />

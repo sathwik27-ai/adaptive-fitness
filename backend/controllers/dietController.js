@@ -3,7 +3,7 @@ const FoodLog = require('../models/FoodLog');
 const User = require('../models/User');
 const {
     calculateBMR, calculateTDEE, adjustCalories, calculateMacros,
-    generateWeeklyPlan,
+    generateWeeklyPlan, createAlternativeOption,
 } = require('../utils/mealGenerator');
 const StatsService = require('../services/StatsService');
 const axios = require('axios');
@@ -86,22 +86,26 @@ const generateDiet = async (req, res, next) => {
             // Fallback to basic variation logic if AI fails
             weeklyPlan = await generateWeeklyPlan({ dietType, dailyCalorieTarget: calorieTarget });
             // Map legacy weekly plan to new structured format
-            weeklyPlan = weeklyPlan.map(day => ({
+            weeklyPlan = weeklyPlan.map((day) => ({
                 ...day,
-                meals: day.meals.map(m => ({
-                    mealType: m.mealSlot || 'lunch',
-                    primaryOption: {
-                        title: m.name,
-                        calories: m.calories,
-                        protein: m.protein,
-                        carbs: m.carbs,
-                        fats: m.fats,
-                        ingredients: (m.ingredients || []).map(i => ({ name: i, quantity: "As per target" })),
-                        instructions: m.instructions
-                    },
-                    alternativeOptions: [],
-                    selectedOptionIndex: 0
-                }))
+                meals: day.meals.map((meal) => {
+                    const primaryOption = {
+                        title: meal.name,
+                        calories: meal.calories,
+                        protein: meal.protein,
+                        carbs: meal.carbs,
+                        fats: meal.fats,
+                        ingredients: (meal.ingredients || []).map((ingredient) => ({ name: ingredient, quantity: 'As per target' })),
+                        instructions: meal.instructions,
+                    };
+                    const mealType = meal.mealSlot || 'lunch';
+                    return {
+                        mealType,
+                        primaryOption,
+                        alternativeOptions: [createAlternativeOption(primaryOption, mealType, dietType)],
+                        selectedOptionIndex: 0,
+                    };
+                }),
             }));
         }
 
@@ -157,10 +161,20 @@ const swapMeal = async (req, res, next) => {
         const profile = await DietProfile.findOne({ userId: req.user._id });
         if (!profile) return res.status(404).json({ success: false, message: 'No profile' });
 
+        if (!Number.isInteger(dayIndex) || !Number.isInteger(mealIndex) || !Number.isInteger(selectedOptionIndex)) {
+            return res.status(400).json({ success: false, message: 'Day, meal, and option indexes must be whole numbers.' });
+        }
         const day = profile.weeklyPlan[dayIndex];
         if (!day || !day.meals[mealIndex]) return res.status(400).json({ success: false, message: 'Invalid meal' });
 
-        day.meals[mealIndex].selectedOptionIndex = selectedOptionIndex;
+        const meal = day.meals[mealIndex];
+        if (!meal.alternativeOptions.length) {
+            meal.alternativeOptions.push(createAlternativeOption(meal.primaryOption, meal.mealType, profile.dietType));
+        }
+        if (selectedOptionIndex < 0 || selectedOptionIndex > meal.alternativeOptions.length) {
+            return res.status(400).json({ success: false, message: 'Invalid meal option.' });
+        }
+        meal.selectedOptionIndex = selectedOptionIndex;
 
         // Backend re-calculation of daily totals based on selection
         day.totals = {

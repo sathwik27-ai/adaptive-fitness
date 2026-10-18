@@ -34,7 +34,7 @@ export const CHART_COLORS = {
 export const BADGE_DEFINITIONS = [
     { id: 1, icon: 'badge', label: 'First Workout', desc: 'Complete your first session', threshold: 1, metric: 'workouts' },
     { id: 2, icon: 'badge', label: '10 Workouts', desc: 'Log 10 workout sessions', threshold: 10, metric: 'workouts' },
-    { id: 3, icon: 'badge', label: 'badge', label: '30 Workouts', desc: 'Log 30 workout sessions', threshold: 30, metric: 'workouts' },
+    { id: 3, icon: 'badge', label: '30 Workouts', desc: 'Log 30 workout sessions', threshold: 30, metric: 'workouts' },
     { id: 4, icon: 'badge', label: 'Goal Tracker', desc: 'Log 5 weight entries', threshold: 5, metric: 'weight' },
     { id: 5, icon: 'badge', label: 'Consistency King', desc: 'Work out 7 days in a row', threshold: 7, metric: 'streak' },
     { id: 6, icon: 'badge', label: 'Nutrition Init', desc: 'Generate your first diet plan', threshold: 1, metric: 'diet' },

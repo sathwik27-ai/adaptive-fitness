@@ -1,18 +1,14 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-    const mongoURI =
-        process.env.MONGO_URI ||
-        process.env.MONGODB_URI ||
-        'mongodb://127.0.0.1:27017/webathon-main';
-
     try {
-        const conn = await mongoose.connect(mongoURI);
-
+        const conn = await mongoose.connect(process.env.MONGO_URI?.trim() || process.env.MONGODB_URI?.trim());
         console.log(`MongoDB connected: ${conn.connection.host}`);
     } catch (err) {
-        console.error('MongoDB connection error:', err.message || err);
-        process.exit(1);
+        throw new Error(
+            `Unable to connect to MongoDB. Check that the local service is running or verify the configured URI, credentials, and network access. Cause: ${err.message}`,
+            { cause: err }
+        );
     }
 };
 

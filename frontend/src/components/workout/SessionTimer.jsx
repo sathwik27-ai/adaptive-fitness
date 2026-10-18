@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-export default function SessionTimer({ duration = 30, onComplete, onTick }) {
+export default function SessionTimer({ duration = 30, onComplete, onTick, autoStart = false }) {
     const totalSeconds = duration * 60;
     const [remaining, setRemaining] = useState(totalSeconds);
-    const [running, setRunning] = useState(false);
+    const [running, setRunning] = useState(autoStart);
 
     const radius = 54;
     const circumference = 2 * Math.PI * radius;

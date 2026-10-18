@@ -5,6 +5,10 @@ const StatsService = require('../services/StatsService');
 // @desc    Connect Google Fit (Get Auth URL)
 // @route   GET /api/health/google-fit/auth
 const connectGoogleFit = (req, res) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(501).json({ success: false, message: 'Google OAuth is not configured' });
+    }
+
     // Pass user ID as state to identify them in the callback if cookies are blocked
     const url = GoogleFitService.getAuthUrl(req.user._id.toString());
     res.json({ success: true, url });

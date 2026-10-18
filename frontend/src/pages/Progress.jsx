@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser } from '../features/authSlice';
 import { useGetStatsQuery, useAddProgressMutation } from '../services/apiSlice';
+import toast from 'react-hot-toast';
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, AreaChart, Area
@@ -20,23 +21,32 @@ export default function Progress() {
     const [showLogForm, setShowLogForm] = useState(false);
     const [logEntry, setLogEntry] = useState({ weight: '', steps: '', sleepHours: '', caloriesBurned: '' });
 
-    const { data: statsData, isLoading } = useGetStatsQuery();
-    const [addProgress] = useAddProgressMutation();
+    const { data: statsData, isLoading, isError } = useGetStatsQuery();
+    const [addProgress, { isLoading: isSaving }] = useAddProgressMutation();
 
     const stats = statsData?.stats || {};
 
-    const handleLog = async () => {
+    const handleLog = async (event) => {
+        event.preventDefault();
         const payload = {};
         if (logEntry.weight) payload.weight = Number(logEntry.weight);
         if (logEntry.steps) payload.steps = Number(logEntry.steps);
         if (logEntry.sleepHours) payload.sleepHours = Number(logEntry.sleepHours);
         if (logEntry.caloriesBurned) payload.caloriesBurned = Number(logEntry.caloriesBurned);
-        await addProgress(payload).unwrap();
-        setLogEntry({ weight: '', steps: '', sleepHours: '', caloriesBurned: '' });
-        setShowLogForm(false);
+        if (Object.keys(payload).length === 0) {
+            toast.error('Enter at least one metric before saving.');
+            return;
+        }
+        try {
+            await addProgress(payload).unwrap();
+            setLogEntry({ weight: '', steps: '', sleepHours: '', caloriesBurned: '' });
+            setShowLogForm(false);
+            toast.success('Progress entry saved.');
+        } catch (error) {
+            toast.error(error?.data?.message || 'Could not save progress entry.');
+        }
     };
 
-    const chartHeight = 350;
     const CHART_COLORS = { primary: '#2F5D3A', orange: '#E59A3A', purple: '#8C6FAE', blue: '#4F7C63' };
 
     const formatDate = (date) => date ? new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : '';
@@ -44,6 +54,11 @@ export default function Progress() {
     if (isLoading) return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary"></div>
+        </div>
+    );
+    if (isError) return (
+        <div role="alert" className="max-w-3xl mx-auto px-4 py-16 text-center text-red-700">
+            Could not load your progress. Please refresh the page and try again.
         </div>
     );
 
@@ -67,15 +82,15 @@ export default function Progress() {
 
             {/* Log form */}
             {showLogForm && (
-                <div className="bg-bg-card rounded-card shadow-card p-6 border border-primary/10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in zoom-in-95 duration-300">
-                    <Input label="Weight (kg)" type="number" value={logEntry.weight} onChange={e => setLogEntry(p => ({ ...p, weight: e.target.value }))} />
-                    <Input label="Steps" type="number" value={logEntry.steps} onChange={e => setLogEntry(p => ({ ...p, steps: e.target.value }))} />
-                    <Input label="Sleep (hrs)" type="number" value={logEntry.sleepHours} onChange={e => setLogEntry(p => ({ ...p, sleepHours: e.target.value }))} />
-                    <Input label="Calories Burned" type="number" value={logEntry.caloriesBurned} onChange={e => setLogEntry(p => ({ ...p, caloriesBurned: e.target.value }))} />
+                <form onSubmit={handleLog} className="bg-bg-card rounded-card shadow-card p-6 border border-primary/10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in zoom-in-95 duration-300">
+                    <Input label="Weight (kg)" type="number" min="0" step="0.1" value={logEntry.weight} onChange={e => setLogEntry(p => ({ ...p, weight: e.target.value }))} />
+                    <Input label="Steps" type="number" min="0" step="1" value={logEntry.steps} onChange={e => setLogEntry(p => ({ ...p, steps: e.target.value }))} />
+                    <Input label="Sleep (hrs)" type="number" min="0" step="0.1" value={logEntry.sleepHours} onChange={e => setLogEntry(p => ({ ...p, sleepHours: e.target.value }))} />
+                    <Input label="Calories Burned" type="number" min="0" step="1" value={logEntry.caloriesBurned} onChange={e => setLogEntry(p => ({ ...p, caloriesBurned: e.target.value }))} />
                     <div className="sm:col-span-2 lg:col-span-4 mt-2">
-                        <Button variant="primary" className="w-full" onClick={handleLog}>Save Entry</Button>
+                        <Button type="submit" variant="primary" className="w-full" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Entry'}</Button>
                     </div>
-                </div>
+                </form>
             )}
 
             {/* Summary Highlights */}
@@ -121,7 +136,7 @@ export default function Progress() {
                                     Target: {user?.profile?.targetWeight || '--'}kg
                                 </div>
                             </div>
-                            <div className="h-[350px] w-full">
+                            {stats.weightTrend?.length ? <div className="h-[350px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={stats.weightTrend?.map(t => ({ ...t, date: formatDate(t.date) })) || []}>
                                         <defs>
@@ -137,7 +152,7 @@ export default function Progress() {
                                         <Area type="monotone" dataKey="weight" name="Weight (kg)" stroke={CHART_COLORS.primary} fillOpacity={1} fill="url(#colorWeight)" strokeWidth={4} />
                                     </AreaChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </div> : <ChartEmptyState message="No weight entries yet. Use Log Metrics to add your first measurement." />}
                         </div>
                     )}
 
@@ -147,7 +162,7 @@ export default function Progress() {
                                 <h3 className="font-bold text-xl text-cta">Activity Volume</h3>
                                 <p className="text-xs text-text-muted mt-0.5">Historical tracking of minutes spent training.</p>
                             </div>
-                            <div className="h-[350px] w-full">
+                            {stats.workoutTrend?.length ? <div className="h-[350px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={stats.workoutTrend?.map(t => ({ ...t, date: formatDate(t.date) })) || []}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6DCCB" />
@@ -157,7 +172,7 @@ export default function Progress() {
                                         <Bar dataKey="duration" name="Minutes" fill={CHART_COLORS.orange} radius={[6, 6, 0, 0]} barSize={40} />
                                     </BarChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </div> : <ChartEmptyState message="No completed workouts yet. Finish a session to see your training activity here." />}
                         </div>
                     )}
 
@@ -169,7 +184,7 @@ export default function Progress() {
                                     Incl. Wearable Data
                                 </div>
                             </div>
-                            <div className="h-[350px] w-full">
+                            {stats.stepsTrend?.length ? <div className="h-[350px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={stats.stepsTrend?.map(t => ({ ...t, date: formatDate(t.date) })) || []}>
                                         <defs>
@@ -185,7 +200,7 @@ export default function Progress() {
                                         <Area type="monotone" dataKey="steps" name="Daily Steps" stroke={CHART_COLORS.blue} fill="url(#colorSteps)" strokeWidth={3} />
                                     </AreaChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </div> : <ChartEmptyState message="No step entries yet. Log steps or connect a supported health provider." />}
                         </div>
                     )}
 
@@ -327,6 +342,14 @@ export default function Progress() {
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+function ChartEmptyState({ message }) {
+    return (
+        <div className="h-[350px] flex items-center justify-center rounded-card border border-dashed border-bg-surface bg-bg-surface/30 px-6 text-center text-sm text-text-muted">
+            {message}
         </div>
     );
 }

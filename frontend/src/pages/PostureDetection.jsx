@@ -37,38 +37,6 @@ export default function PostureDetection() {
 
     const [saveSession] = useSavePostureSessionMutation();
 
-    const startCamera = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        setSessionSummary(null);
-        sessionDataRef.current = { scores: [], corrections: 0, startTime: Date.now() };
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
-            }
-
-            // Dynamically load TF + MoveNet
-            const tf = await import('@tensorflow/tfjs-core');
-            await import('@tensorflow/tfjs-backend-webgl');
-            await tf.setBackend('webgl');
-            await tf.ready();
-            const poseDetection = await import('@tensorflow-models/pose-detection');
-            const detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
-                modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-            });
-            detectorRef.current = detector;
-            setActive(true);
-            setLoading(false);
-            detectLoop();
-        } catch (err) {
-            setError(err.message || 'Failed to start camera');
-            setLoading(false);
-        }
-    }, []);
-
     const stopCamera = useCallback(async () => {
         if (animRef.current) cancelAnimationFrame(animRef.current);
         if (videoRef.current?.srcObject) {
@@ -92,7 +60,7 @@ export default function PostureDetection() {
             try {
                 await saveSession(summary).unwrap();
                 toast.success('Posture session saved!');
-            } catch (err) {
+            } catch {
                 toast.error('Failed to save session');
             }
         }
@@ -245,6 +213,41 @@ export default function PostureDetection() {
 
         animRef.current = requestAnimationFrame(detectLoop);
     }, []);
+
+    const startCamera = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        setSessionSummary(null);
+        sessionDataRef.current = { scores: [], corrections: 0, startTime: Date.now() };
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                await videoRef.current.play();
+            }
+
+            const tf = await import('@tensorflow/tfjs-core');
+            await import('@tensorflow/tfjs-backend-webgl');
+            await tf.setBackend('webgl');
+            await tf.ready();
+            const poseDetection = await import('@tensorflow-models/pose-detection');
+            const detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+                modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+            });
+            detectorRef.current = detector;
+            setActive(true);
+            setLoading(false);
+            detectLoop();
+        } catch (err) {
+            if (videoRef.current?.srcObject) {
+                videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+                videoRef.current.srcObject = null;
+            }
+            setError(err.message || 'Failed to start camera');
+            setLoading(false);
+        }
+    }, [detectLoop]);
 
     useEffect(() => { return () => stopCamera(); }, [stopCamera]);
 

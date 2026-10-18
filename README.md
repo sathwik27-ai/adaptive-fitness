@@ -7,11 +7,15 @@ Adaptive Fitness is a full-stack web application that brings workout discovery, 
 ## Contents
 
 - [Highlights](#highlights)
+- [Problem and objectives](#problem-and-objectives)
+- [How authentication and planning work](#how-authentication-and-planning-work)
+- [Architecture](#architecture)
 - [Technology](#technology)
 - [Requirements](#requirements)
 - [Run locally on Windows](#run-locally-on-windows)
 - [Configure the backend](#configure-the-backend)
 - [Optional integrations](#optional-integrations)
+- [Deployments](#deployments)
 - [Useful commands](#useful-commands)
 - [Troubleshooting](#troubleshooting)
 - [Project layout](#project-layout)
@@ -40,6 +44,36 @@ Adaptive Fitness is a full-stack web application that brings workout discovery, 
 - Explore dashboard insights and posture-session tools.
 - Use the Spotify playlist embeds while signed in. Playback requires internet access and Spotify embeds to be available in your browser.
 - Connect optional Google Fit, OAuth login, email, image storage, and hosted AI integrations when you supply provider credentials.
+
+## Problem and objectives
+
+Fitness information and day-to-day tracking can be scattered across separate tools. Adaptive Fitness brings workout planning, nutrition planning, and activity logs into one account so a user can record personal goals, follow a weekly routine, and review progress. Its objectives are to:
+
+- Create a workout schedule from the user's onboarding profile and training preferences.
+- Make meal planning adjustable to dietary preferences and individual weekdays.
+- Keep workouts, saved items, food entries, and progress associated with the authenticated account.
+- Provide a single dashboard and accessible navigation for the main fitness workflows.
+
+## How authentication and planning work
+
+1. Registration or login sends credentials to the Express API. The server validates the account and sets a signed JWT in an HTTP-only cookie; the token is not stored in browser local storage.
+2. The frontend includes cookies with API requests. On app startup, it checks the current session through `GET /api/users/me`; protected routes wait for that check before rendering or redirecting.
+3. During onboarding, the frontend submits personal metrics and workout preferences to `PATCH /api/users/me`. The backend persists the profile and creates a workout schedule, then the frontend routes the completed account to the dashboard.
+4. Diet planning is a separate workflow. The user submits diet preferences to `POST /api/diet/generate`; meals and food logs are managed through the diet API.
+5. Logout calls the protected API endpoint and clears the same HTTP-only cookie.
+
+The Vercel frontend and Render API are different sites. Production cookies therefore need `SameSite=None; Secure`, and the API needs credentialed CORS for the exact Vercel origin. The backend configures this when `NODE_ENV=production`; local HTTP development uses `SameSite=Lax`.
+
+## Architecture
+
+| Component | Responsibility |
+| --- | --- |
+| React/Vite frontend | Pages, forms, onboarding, charts, routing, client-side state, and API calls. |
+| Express backend | Authentication, authorization, validation, API workflows, and integration endpoints. |
+| MongoDB/Mongoose | Persistent user profiles, plans, workouts, progress, and logs. |
+| RTK Query | Frontend API requests, credential inclusion, response caching, and mutation cache invalidation. |
+
+The browser talks directly to the API; Vite does not proxy API requests. API location and credentialed CORS must match the environment where each side is deployed.
 
 ## Technology
 
@@ -200,6 +234,19 @@ The core local application requires MongoDB and `JWT_SECRET`. These integrations
 
 For local Spotify embeds, no Spotify API key is used; an internet connection is needed, and browser/network policies may block embedded playback.
 
+## Deployments
+
+- Frontend: [adaptive-fitness-seven.vercel.app](https://adaptive-fitness-seven.vercel.app/)
+- Backend: [adaptive-fitness-viux.onrender.com](https://adaptive-fitness-viux.onrender.com/)
+- API health: [adaptive-fitness-viux.onrender.com/api/health](https://adaptive-fitness-viux.onrender.com/api/health)
+- Repository: [github.com/sathwik27-ai/adaptive-fitness](https://github.com/sathwik27-ai/adaptive-fitness)
+
+Configure the Vercel project environment variable `VITE_API_BASE_URL` as `https://adaptive-fitness-viux.onrender.com/api` for the Production deployment, then redeploy the frontend after changing it. This is a public API URL, not a credential.
+
+In Render, set `NODE_ENV=production`, `FRONTEND_URL=https://adaptive-fitness-seven.vercel.app`, `MONGO_URI` to the private Atlas connection string, and `JWT_SECRET` to a strong random secret. Keep secrets only in Render's environment settings. The server's credentialed CORS allowlist uses the exact `FRONTEND_URL`. Production login cookies are HTTP-only, `Secure`, and `SameSite=None` so browser requests from the Vercel app can send them to the separate Render origin; local development retains `SameSite=Lax`.
+
+After code changes, push the verified commit and confirm that Vercel and Render have deployed the expected revisions. Check `/api/health`, then test login, onboarding submission, protected-page navigation, and page refresh in the production browser. If a browser blocks third-party cookies for separate `vercel.app` and `onrender.com` sites even with `SameSite=None; Secure`, use custom frontend/backend domains under the same site and update `VITE_API_BASE_URL`, `FRONTEND_URL`, and the provider callback URLs accordingly.
+
 ## Useful commands
 
 | Purpose | PowerShell command (run in the indicated folder) |
@@ -222,6 +269,7 @@ Stop each development server with **Ctrl+C** in its terminal window.
 | MongoDB `ECONNREFUSED`, server-selection timeout, or API not listening | Start the local MongoDB service or check Atlas URI, database credentials, IP allowlist, and network connectivity. |
 | Browser reports a CORS error | Ensure `FRONTEND_URL` matches the origin in the address bar. `localhost` and `127.0.0.1` are different hostnames; use one hostname consistently for frontend and API. Restart the backend after changes. |
 | Frontend cannot reach the API | Confirm the backend is running on port 5000 and check `VITE_API_BASE_URL`. Restart Vite after changing frontend environment variables. |
+| Production login succeeds but onboarding/dashboard sends you back to login | The API must issue a cross-site cookie with `SameSite=None; Secure`. Set `NODE_ENV=production` on Render and verify `FRONTEND_URL` and Vercel's `VITE_API_BASE_URL` match the deployment URLs above; redeploy both services after relevant changes. Browser third-party-cookie blocking may require same-site custom domains. |
 | Login suddenly stops accepting an existing session | A changed `JWT_SECRET` invalidates previously issued tokens. Sign in again; avoid rotating the secret unless intended. |
 | No workouts appear | Run `npm run seed:workouts` from `backend` and check that the API uses the same database you seeded. |
 | Google/Facebook login, email, uploads, AI, or Fit sync unavailable | These require the corresponding optional provider credentials and correctly configured provider account/callbacks. Core local use does not include provider credentials. |

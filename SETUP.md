@@ -160,7 +160,29 @@ The frontend includes browser-camera posture detection (grant camera access on l
 
 The dashboard's Spotify playlist player is an embedded third-party player and needs an internet connection, but no Spotify credentials.
 
-## 9. Troubleshooting
+## 9. Production deployment (Vercel + Render)
+
+The deployed application uses:
+
+- Frontend: `https://adaptive-fitness-seven.vercel.app`
+- Backend/API: `https://adaptive-fitness-viux.onrender.com`
+- Health endpoint: `https://adaptive-fitness-viux.onrender.com/api/health`
+
+Set these project environment variables in the hosting dashboards (never in committed files):
+
+| Host | Variable | Value |
+|---|---|---|
+| Vercel | `VITE_API_BASE_URL` | `https://adaptive-fitness-viux.onrender.com/api` |
+| Render | `NODE_ENV` | `production` |
+| Render | `FRONTEND_URL` | `https://adaptive-fitness-seven.vercel.app` |
+| Render | `MONGO_URI` | Your private MongoDB Atlas connection string |
+| Render | `JWT_SECRET` | A strong random secret, kept private |
+
+The frontend uses credentialed requests. The backend must return the exact Vercel origin in CORS responses and set the HTTP-only JWT cookie with `SameSite=None; Secure` in production. Local development uses `SameSite=Lax` and does not require cross-site cookies. Do not set a cookie domain; it should remain host-only for the API host. After changing Vercel variables, redeploy the frontend so Vite includes the new API URL. After changing backend code or Render variables, redeploy the Render service.
+
+Verify `/api/health`, then test account login, onboarding submission, navigation to a protected page, refresh, and logout in a production browser. Hosting health and CORS preflight alone do not verify an authenticated session. Some browsers block third-party cookies across the separate `vercel.app` and `onrender.com` sites; if that applies, configure custom frontend and API domains under the same site and update the frontend URL, API base URL, backend CORS origin, and OAuth callback URLs.
+
+## 10. Troubleshooting
 
 - **Missing `JWT_SECRET` / secret validation error:** create `backend\.env` from the example and replace its placeholder with a random secret using the command in section 2. Do not put the JWT secret in a frontend file.
 - **MongoDB connection error / server selection timeout:** make sure MongoDB is running locally, or check the Atlas URI, database-user password, IP access list, network access, and database name. The API intentionally does not listen if the database connection fails.
@@ -171,6 +193,6 @@ The dashboard's Spotify playlist player is an embedded third-party player and ne
 - **Workout image uploads fail:** configure all three Cloudinary values. This integration is not needed for seeded/default workout data.
 - **Port already in use:** close the old dev server or set an unused `PORT` and update `VITE_API_BASE_URL` accordingly.
 
-## 10. Stop the application
+## 11. Stop the application
 
 In each server terminal, press **Ctrl+C**. For windows launched by `start-dev.ps1`, close the corresponding PowerShell windows or press **Ctrl+C** in each.

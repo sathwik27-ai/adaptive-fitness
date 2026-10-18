@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { generateToken, setTokenCookie } = require('../utils/tokenHelper');
+const { generateToken, setTokenCookie, clearTokenCookie } = require('../utils/tokenHelper');
 const { sendWelcomeEmail } = require('../utils/emailHelper');
 
 // POST /api/auth/register
@@ -66,7 +66,7 @@ const login = async (req, res, next) => {
 
 // POST /api/auth/logout
 const logout = (req, res) => {
-    res.clearCookie('token');
+    clearTokenCookie(res);
     res.json({ success: true, message: 'Logged out' });
 };
 

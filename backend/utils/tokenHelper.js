@@ -7,13 +7,25 @@ const generateToken = (userId) => {
     });
 };
 
+const getTokenCookieOptions = () => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+        path: '/',
+    };
+};
+
 const setTokenCookie = (res, token) => {
     res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        ...getTokenCookieOptions(),
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 };
 
-module.exports = { generateToken, setTokenCookie };
+const clearTokenCookie = (res) => {
+    res.clearCookie('token', getTokenCookieOptions());
+};
+
+module.exports = { generateToken, setTokenCookie, clearTokenCookie };

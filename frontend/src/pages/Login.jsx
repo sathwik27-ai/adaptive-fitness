@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -17,6 +17,7 @@ const schema = z.object({
 
 export default function Login() {
   const dispatch = useDispatch();
+  const location = useLocation();
   const navigate = useNavigate();
   const [login, { isLoading, error }] = useLoginMutation();
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) });
@@ -45,6 +46,11 @@ export default function Login() {
         </div>
 
         <div className="bg-bg-card rounded-card shadow-card p-8">
+          {location.state?.sessionExpired && (
+            <div role="alert" className="mb-4 p-3 bg-amber-50 text-amber-800 text-sm rounded-btn border border-amber-200">
+              Your session expired. Sign in again to continue; any onboarding progress in this tab has been saved.
+            </div>
+          )}
           {error && (
             <div role="alert" className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-btn border border-red-200">
               {error.data?.message || 'Login failed. Please try again.'}

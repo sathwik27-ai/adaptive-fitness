@@ -8,11 +8,13 @@ const generateToken = (userId) => {
 };
 
 const getTokenCookieOptions = () => {
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isSecureDeployment = process.env.NODE_ENV === 'production'
+        || process.env.RENDER === 'true'
+        || /^https:\/\//i.test(process.env.RENDER_EXTERNAL_URL || '');
     return {
         httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
+        secure: isSecureDeployment,
+        sameSite: isSecureDeployment ? 'none' : 'lax',
         path: '/',
     };
 };
@@ -28,4 +30,4 @@ const clearTokenCookie = (res) => {
     res.clearCookie('token', getTokenCookieOptions());
 };
 
-module.exports = { generateToken, setTokenCookie, clearTokenCookie };
+module.exports = { generateToken, getTokenCookieOptions, setTokenCookie, clearTokenCookie };

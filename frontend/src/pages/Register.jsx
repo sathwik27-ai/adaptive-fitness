@@ -31,10 +31,12 @@ export default function Register() {
         } catch (err) {
             const message = err?.data?.message
                 || (err?.status === 'FETCH_ERROR'
-                    ? 'Could not reach the server. Check that the backend is running and try again.'
+                    ? `The browser received no response from the API at ${API_BASE_URL}. Check your connection and browser network or CORS settings, then try again.`
                     : err?.status === 'PARSING_ERROR'
                         ? 'The server returned an invalid response. Check the backend logs and try again.'
-                        : 'Registration failed. Please check your details and try again.');
+                        : typeof err?.status === 'number'
+                            ? `The server returned HTTP ${err.status}. Please try again.`
+                            : 'Registration failed. Please check your details and try again.');
             setError('root', { message });
         }
     };

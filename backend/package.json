@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "test": "node --test tests/tokenHelper.test.js",
     "seed:workouts": "node seeds/seedWorkouts.js"
   },
   "keywords": [],

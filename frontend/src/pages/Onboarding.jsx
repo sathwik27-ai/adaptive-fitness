@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useUpdateMeMutation } from '../services/apiSlice';
-import { setCredentials } from '../features/authSlice';
+import { selectCurrentUser, setCredentials } from '../features/authSlice';
+import {
+    clearOnboardingDraft,
+    getOnboardingDraftKey,
+    loadOnboardingDraft,
+    saveOnboardingDraft,
+} from '../services/onboardingDraft';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import ProgressBar from '../components/ui/ProgressBar';
@@ -24,11 +30,14 @@ const LEVELS = ['beginner', 'intermediate', 'advanced'];
 export default function Onboarding() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const user = useSelector(selectCurrentUser);
     const [updateMe] = useUpdateMeMutation();
 
-    const [step, setStep] = useState(0);
-    const [formData, setFormData] = useState({});
-    const [equipment, setEquipment] = useState([]);
+    const draftKey = getOnboardingDraftKey(user?._id);
+    const [draft] = useState(() => loadOnboardingDraft(window.sessionStorage, draftKey));
+    const [step, setStep] = useState(draft?.step ?? 0);
+    const [formData, setFormData] = useState(draft?.formData ?? {});
+    const [equipment, setEquipment] = useState(draft?.equipment ?? []);
     const [submitError, setSubmitError] = useState('');
 
     const schema = [
@@ -38,7 +47,10 @@ export default function Onboarding() {
         z.object({ location: z.enum(['home', 'gym']), timePerWorkout: z.coerce.number().min(10).max(180) }),
     ][step];
 
-    const { control, register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema) });
+    const { control, register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+        resolver: zodResolver(schema),
+        defaultValues: draft?.formData,
+    });
     const selectedGender = useWatch({ control, name: 'gender' });
     const selectedGoal = useWatch({ control, name: 'goal' });
     const selectedFitnessLevel = useWatch({ control, name: 'fitnessLevel' });
@@ -49,9 +61,15 @@ export default function Onboarding() {
         setSubmitError('');
         const merged = { ...formData, ...data };
         setFormData(merged);
-        if (step < 3) { setStep(s => s + 1); return; }
+        if (step < 3) {
+            const nextStep = step + 1;
+            saveOnboardingDraft(window.sessionStorage, draftKey, { step: nextStep, formData: merged, equipment });
+            setStep(nextStep);
+            return;
+        }
 
         // Final step — save to backend
+        saveOnboardingDraft(window.sessionStorage, draftKey, { step, formData: merged, equipment });
         try {
             const res = await updateMe({
                 onboardingComplete: true,
@@ -66,6 +84,7 @@ export default function Onboarding() {
             if (!res?.user?.onboardingComplete) {
                 throw new Error('The server did not confirm that onboarding was completed.');
             }
+            clearOnboardingDraft(window.sessionStorage, draftKey);
             dispatch(setCredentials(res.user));
             navigate('/dashboard');
         } catch (err) {
@@ -78,8 +97,17 @@ export default function Onboarding() {
         }
     };
 
-    const toggleEquipment = (item) =>
-        setEquipment(e => e.includes(item) ? e.filter(x => x !== item) : [...e, item]);
+    const toggleEquipment = (item) => {
+        const updatedEquipment = equipment.includes(item)
+            ? equipment.filter((entry) => entry !== item)
+            : [...equipment, item];
+        setEquipment(updatedEquipment);
+        saveOnboardingDraft(window.sessionStorage, draftKey, {
+            step,
+            formData,
+            equipment: updatedEquipment,
+        });
+    };
 
     return (
         <div className="min-h-screen bg-bg-main flex flex-col items-center justify-center px-4 py-12">

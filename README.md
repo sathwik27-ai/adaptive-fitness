@@ -62,7 +62,7 @@ Fitness information and day-to-day tracking can be scattered across separate too
 4. Diet planning is a separate workflow. The user submits diet preferences to `POST /api/diet/generate`; meals and food logs are managed through the diet API.
 5. Logout calls the protected API endpoint and clears the same HTTP-only cookie.
 
-The Vercel frontend and Render API are different sites. Production cookies therefore need `SameSite=None; Secure`, and the API needs credentialed CORS for the exact Vercel origin. The backend configures this when `NODE_ENV=production`; local HTTP development uses `SameSite=Lax`.
+In production, Vercel rewrites same-origin `/api/*` requests to the Render API. This keeps the HTTP-only session cookie first-party to the frontend site instead of relying on browsers accepting a third-party cookie. Render still restricts credentialed CORS to the configured Vercel origin. Login and registration also confirm the session with `GET /api/users/me` before routing.
 
 ## Architecture
 
@@ -73,7 +73,7 @@ The Vercel frontend and Render API are different sites. Production cookies there
 | MongoDB/Mongoose | Persistent user profiles, plans, workouts, progress, and logs. |
 | RTK Query | Frontend API requests, credential inclusion, response caching, and mutation cache invalidation. |
 
-The browser talks directly to the API; Vite does not proxy API requests. API location and credentialed CORS must match the environment where each side is deployed.
+In local development, the browser talks directly to the API on port 5000; Vite does not proxy API requests. In production, browser requests use the Vercel same-origin `/api` rewrite to Render. Credentialed CORS must allow the deployed frontend origin.
 
 ## Technology
 
@@ -241,13 +241,13 @@ For local Spotify embeds, no Spotify API key is used; an internet connection is 
 - API health: [adaptive-fitness-viux.onrender.com/api/health](https://adaptive-fitness-viux.onrender.com/api/health)
 - Repository: [github.com/sathwik27-ai/adaptive-fitness](https://github.com/sathwik27-ai/adaptive-fitness)
 
-Configure the Vercel project environment variable `VITE_API_BASE_URL` as `https://adaptive-fitness-viux.onrender.com/api` for the Production deployment, then redeploy the frontend after changing it. This is a public API URL, not a credential.
+The production client uses the same-origin `/api` route. Leave `VITE_API_BASE_URL` unset in Vercel or set it to `/api`; the Vercel rewrite forwards requests to `https://adaptive-fitness-viux.onrender.com/api`. Do not set the production client to call Render directly, because that makes the HTTP-only session cookie third-party in browsers that block third-party cookies.
 
 The frontend's `vercel.json` rewrites browser-side routes such as `/register`, `/login`, and `/dashboard` to the Vite entry document so direct links and page refreshes load the React application.
 
-In Render, set `NODE_ENV=production`, `FRONTEND_URL=https://adaptive-fitness-seven.vercel.app`, `MONGO_URI` to the private Atlas connection string, and `JWT_SECRET` to a strong random secret. Keep secrets only in Render's environment settings. The server's credentialed CORS allowlist uses the exact `FRONTEND_URL`. Login cookies are HTTP-only, `Secure`, and `SameSite=None` when `NODE_ENV=production` or Render's HTTPS deployment variables are present; local development retains `SameSite=Lax`.
+In Render, set `NODE_ENV=production`, `FRONTEND_URL=https://adaptive-fitness-seven.vercel.app`, `MONGO_URI` to the private Atlas connection string, and `JWT_SECRET` to a strong random secret. Keep secrets only in Render's environment settings. The server's credentialed CORS allowlist uses the exact `FRONTEND_URL`. Login cookies remain HTTP-only and `Secure` in production; local development retains `SameSite=Lax`.
 
-After code changes, push the verified commit and confirm that Vercel and Render have deployed the expected revisions. Check `/api/health`, then test login, onboarding submission, protected-page navigation, and page refresh in the production browser. If a browser blocks third-party cookies for separate `vercel.app` and `onrender.com` sites even with `SameSite=None; Secure`, use custom frontend/backend domains under the same site and update `VITE_API_BASE_URL`, `FRONTEND_URL`, and the provider callback URLs accordingly.
+After code changes, push the verified commit and confirm that Vercel and Render have deployed the expected revisions. Check `/api/health`, then test login, onboarding submission, protected-page navigation, and page refresh in the production browser. If social login is enabled, register `https://adaptive-fitness-seven.vercel.app/api/auth/google/callback` and `https://adaptive-fitness-seven.vercel.app/api/auth/facebook/callback` with the respective providers. Set `GOOGLE_CALLBACK_URL` and `FACEBOOK_CALLBACK_URL` to those same Vercel URLs in Render, or leave them unset to use the production defaults.
 
 ## Useful commands
 
@@ -271,8 +271,8 @@ Stop each development server with **Ctrl+C** in its terminal window.
 | `JwtStrategy requires a secret or key` or missing-secret startup error | Confirm `backend\.env` exists and `JWT_SECRET` is set to a strong, non-placeholder value. Restart the API after editing it. |
 | MongoDB `ECONNREFUSED`, server-selection timeout, or API not listening | Start the local MongoDB service or check Atlas URI, database credentials, IP allowlist, and network connectivity. |
 | Browser reports a CORS error | Ensure `FRONTEND_URL` matches the origin in the address bar. `localhost` and `127.0.0.1` are different hostnames; use one hostname consistently for frontend and API. Restart the backend after changes. |
-| Frontend cannot reach the API | Production defaults to `https://adaptive-fitness-viux.onrender.com/api`; confirm the Vercel build has the same `VITE_API_BASE_URL`, verify the API health endpoint, and check the browser Network panel for the registration request's URL and network/CORS error. For local development, make sure the backend is running on port 5000. |
-| Production login succeeds but onboarding/dashboard sends you back to login | The API must issue a cross-site cookie with `SameSite=None; Secure`. The server detects Render HTTPS deployments as well as `NODE_ENV=production`; verify `FRONTEND_URL` and Vercel's `VITE_API_BASE_URL` match the deployment URLs above. Browser third-party-cookie blocking may still require same-site custom domains. |
+| Frontend cannot reach the API | Production calls the same-origin `/api` route, which Vercel rewrites to Render. Confirm `frontend/vercel.json` is deployed, verify the backend health endpoint, and inspect the browser Network panel for the request status. For local development, make sure the backend is running on port 5000. |
+| Production login succeeds but onboarding/dashboard sends you back to login | Confirm Vercel uses the same-origin API rewrite and the Render CORS `FRONTEND_URL` matches the Vercel origin. Login now verifies `GET /api/users/me` before navigating. The session cookie should be host-only to the frontend origin when delivered through the rewrite; do not set a cookie `Domain`. |
 | Onboarding request fails but user is sent to login | The frontend clears auth only when a protected API response explicitly identifies an invalid session. Other failures stay on onboarding and display the API error. Onboarding progress is held in this tab and restored after signing in again. Check the failed `PATCH /api/users/me` response in the browser Network panel; do not share request cookies or credentials. |
 | Login suddenly stops accepting an existing session | A changed `JWT_SECRET` invalidates previously issued tokens. Sign in again; avoid rotating the secret unless intended. |
 | No workouts appear | Run `npm run seed:workouts` from `backend` and check that the API uses the same database you seeded. |

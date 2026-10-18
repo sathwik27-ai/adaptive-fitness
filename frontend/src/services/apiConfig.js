@@ -1,10 +1,11 @@
-export const PRODUCTION_API_BASE_URL = 'https://adaptive-fitness-viux.onrender.com/api';
+export const PRODUCTION_API_BASE_URL = '/api';
+export const PRODUCTION_API_ORIGIN = 'https://adaptive-fitness-viux.onrender.com';
 
 export function resolveApiBaseUrl(configuredUrl, isProduction, location) {
     const fallback = isProduction
-        ? PRODUCTION_API_BASE_URL
+        ? `${PRODUCTION_API_ORIGIN}/api`
         : `${location.protocol}//${location.hostname}:5000/api`;
-    const parsed = new URL(configuredUrl?.trim() || fallback);
+    const parsed = new URL(configuredUrl?.trim() || fallback, location.origin);
 
     if (!['http:', 'https:'].includes(parsed.protocol)) {
         throw new Error('VITE_API_BASE_URL must use HTTP or HTTPS.');
@@ -21,5 +22,6 @@ export function resolveApiBaseUrl(configuredUrl, isProduction, location) {
         throw new Error('VITE_API_BASE_URL must point to the API root and end in /api.');
     }
 
+    if (isProduction) return PRODUCTION_API_BASE_URL;
     return `${parsed.origin}${pathname || '/api'}`;
 }

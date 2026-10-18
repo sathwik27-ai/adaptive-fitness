@@ -35,6 +35,7 @@ export const apiSlice = createApi({
 
         // User
         getMe: builder.query({ query: () => '/users/me', providesTags: ['User'] }),
+        verifySession: builder.query({ query: () => '/users/me' }),
         updateMe: builder.mutation({ query: (body) => ({ url: '/users/me', method: 'PATCH', body }), invalidatesTags: ['User'] }),
         toggleSaved: builder.mutation({ query: (body) => ({ url: '/users/me/saved', method: 'PATCH', body }), invalidatesTags: ['User'] }),
 
@@ -81,7 +82,7 @@ export const apiSlice = createApi({
 
 export const {
     useRegisterMutation, useLoginMutation, useLogoutMutation,
-    useGetMeQuery, useUpdateMeMutation, useToggleSavedMutation,
+    useGetMeQuery, useLazyVerifySessionQuery, useUpdateMeMutation, useToggleSavedMutation,
     useGetWorkoutsQuery, useGetWorkoutQuery, useLogWorkoutMutation, useGetWorkoutLogsQuery,
     useCreateWorkoutMutation, useDeleteWorkoutMutation,
     useGenerateDietMutation, useGetDietQuery, useSwapMealMutation, useSaveDietMutation, useLogFoodMutation, useGetFoodLogsQuery,

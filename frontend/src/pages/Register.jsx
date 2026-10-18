@@ -4,8 +4,8 @@ import { useDispatch } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { API_BASE_URL, useRegisterMutation } from '../services/apiSlice';
-import { setCredentials } from '../features/authSlice';
+import { API_BASE_URL, useLazyVerifySessionQuery, useRegisterMutation } from '../services/apiSlice';
+import { clearCredentials, setCredentials } from '../features/authSlice';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { Leaf } from 'lucide-react';
@@ -21,22 +21,34 @@ export default function Register() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const [register] = useRegisterMutation();
+    const [verifySession] = useLazyVerifySessionQuery();
     const { register: reg, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm({ resolver: zodResolver(schema) });
 
     const onSubmit = async (data) => {
+        let accountCreated = false;
         try {
-            const res = await register({ name: data.name, email: data.email, password: data.password }).unwrap();
-            dispatch(setCredentials(res.user));
+            await register({ name: data.name, email: data.email, password: data.password }).unwrap();
+            accountCreated = true;
+            const session = await verifySession(undefined, true).unwrap();
+            if (!session?.user) {
+                throw new Error('The server did not return an authenticated user.');
+            }
+            dispatch(setCredentials(session.user));
             navigate('/onboarding');
         } catch (err) {
+            if (accountCreated) dispatch(clearCredentials());
             const message = err?.data?.message
-                || (err?.status === 'FETCH_ERROR'
-                    ? `The browser received no response from the API at ${API_BASE_URL}. Check your connection and browser network or CORS settings, then try again.`
-                    : err?.status === 'PARSING_ERROR'
-                        ? 'The server returned an invalid response. Check the backend logs and try again.'
-                        : typeof err?.status === 'number'
-                            ? `The server returned HTTP ${err.status}. Please try again.`
-                            : 'Registration failed. Please check your details and try again.');
+                || (err?.data?.code === 'SESSION_INVALID'
+                    ? 'Your account was created, but the server could not confirm the sign-in session. Please log in to continue.'
+                    : err?.status === 'FETCH_ERROR'
+                        ? `The browser received no response from the API at ${API_BASE_URL}. Check your connection and browser network or CORS settings, then try again.`
+                        : err?.status === 'PARSING_ERROR'
+                            ? 'The server returned an invalid response. Check the backend logs and try again.'
+                            : typeof err?.status === 'number'
+                                ? `The server returned HTTP ${err.status}. Please try again.`
+                                : err instanceof Error
+                                    ? err.message
+                                    : 'Registration failed. Please check your details and try again.');
             setError('root', { message });
         }
     };

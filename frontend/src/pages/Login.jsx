@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { API_BASE_URL, useLoginMutation } from '../services/apiSlice';
-import { setCredentials } from '../features/authSlice';
+import { API_BASE_URL, useLazyVerifySessionQuery, useLoginMutation } from '../services/apiSlice';
+import { clearCredentials, setCredentials } from '../features/authSlice';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { Leaf } from 'lucide-react';
@@ -20,15 +20,36 @@ export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
   const [login, { isLoading, error }] = useLoginMutation();
+  const [verifySession] = useLazyVerifySessionQuery();
+  const [sessionError, setSessionError] = useState('');
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data) => {
+    setSessionError('');
+    let loginAccepted = false;
     try {
-      const res = await login(data).unwrap();
-      dispatch(setCredentials(res.user));
-      navigate(res.user.onboardingComplete ? '/dashboard' : '/onboarding');
+      await login(data).unwrap();
+      loginAccepted = true;
+      const session = await verifySession(undefined, true).unwrap();
+      if (!session?.user) {
+        throw new Error('The server did not return an authenticated user.');
+      }
+      dispatch(setCredentials(session.user));
+      navigate(session.user.onboardingComplete ? '/dashboard' : '/onboarding');
     } catch (err) {
-      if (!err?.data) console.error('Login request failed:', err);
+      if (!loginAccepted) return;
+      dispatch(clearCredentials());
+      if (err?.status === 'FETCH_ERROR') {
+        setSessionError('Sign-in could not be confirmed because the browser received no response from the API. Check your connection and try again.');
+      } else if (err?.status === 401 || err?.data?.code === 'SESSION_INVALID') {
+        setSessionError('The server accepted your credentials but did not confirm the session. Please try again.');
+      } else if (err?.data?.message) {
+        setSessionError(err.data.message);
+      } else if (err instanceof Error) {
+        setSessionError(err.message);
+      } else {
+        setSessionError('Unable to confirm your sign-in. Please try again.');
+      }
     }
   };
 
@@ -55,6 +76,11 @@ export default function Login() {
           {error && (
             <div role="alert" className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-btn border border-red-200">
               {error.data?.message || 'Login failed. Please try again.'}
+            </div>
+          )}
+          {sessionError && (
+            <div role="alert" className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-btn border border-red-200">
+              {sessionError}
             </div>
           )}
 

@@ -173,17 +173,17 @@ Set these project environment variables in the hosting dashboards (never in comm
 
 | Host | Variable | Value |
 |---|---|---|
-| Vercel | `VITE_API_BASE_URL` | `https://adaptive-fitness-viux.onrender.com/api` |
+| Vercel | `VITE_API_BASE_URL` | Leave unset or set to `/api`; production calls use the Vercel same-origin proxy. |
 | Render | `NODE_ENV` | `production` |
 | Render | `FRONTEND_URL` | `https://adaptive-fitness-seven.vercel.app` |
 | Render | `MONGO_URI` | Your private MongoDB Atlas connection string |
 | Render | `JWT_SECRET` | A strong random secret, kept private |
 
-The frontend uses credentialed requests. The backend must return the exact Vercel origin in CORS responses and set the HTTP-only JWT cookie with `SameSite=None; Secure` in production. Local development uses `SameSite=Lax` and does not require cross-site cookies. Do not set a cookie domain; it should remain host-only for the API host. After changing Vercel variables, redeploy the frontend so Vite includes the new API URL. After changing backend code or Render variables, redeploy the Render service.
+The frontend uses credentialed requests through a Vercel same-origin `/api/*` rewrite to Render. This makes the HTTP-only JWT cookie first-party to the frontend host and avoids relying on third-party cookie support. Login and registration verify the session with `GET /api/users/me` before proceeding. Local development calls the backend directly and uses `SameSite=Lax`. Do not set a cookie domain. After changing the rewrite or Vercel variables, redeploy the frontend. After changing backend code or Render variables, redeploy the Render service.
 
-The Vercel project should use `frontend` as its Root Directory; `frontend\vercel.json` rewrites app routes to the Vite entry document so direct links such as `/register` work. If the Vercel Root Directory is set to the repository root instead, configure the build/output settings for `frontend` and ensure this rewrite configuration is applied by that deployment.
+The Vercel project should use `frontend` as its Root Directory; `frontend\vercel.json` rewrites `/api/*` requests to Render and browser-side routes to the Vite entry document so direct links such as `/register` work. If social login is enabled, configure the provider authorized callback URL and Render's `GOOGLE_CALLBACK_URL` or `FACEBOOK_CALLBACK_URL` to use the Vercel same-origin `/api/auth/<provider>/callback` path. If the Vercel Root Directory is set to the repository root instead, configure the build/output settings for `frontend` and ensure this rewrite configuration is applied by that deployment.
 
-Verify `/api/health`, then test account login, onboarding submission, navigation to a protected page, refresh, and logout in a production browser. Hosting health and CORS preflight alone do not verify an authenticated session. Some browsers block third-party cookies across the separate `vercel.app` and `onrender.com` sites; if that applies, configure custom frontend and API domains under the same site and update the frontend URL, API base URL, backend CORS origin, and OAuth callback URLs.
+Verify `/api/health`, then test account login, onboarding submission, navigation to a protected page, refresh, and logout in a production browser. Hosting health and CORS preflight alone do not verify an authenticated session. If OAuth is enabled, configure its provider callback URL to use the Vercel same-origin `/api/auth/<provider>/callback` route.
 
 ## 10. Troubleshooting
 

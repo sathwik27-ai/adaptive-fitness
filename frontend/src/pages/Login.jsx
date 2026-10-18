@@ -48,7 +48,8 @@ export default function Login() {
         <div className="bg-bg-card rounded-card shadow-card p-8">
           {location.state?.sessionExpired && (
             <div role="alert" className="mb-4 p-3 bg-amber-50 text-amber-800 text-sm rounded-btn border border-amber-200">
-              Your session expired. Sign in again to continue; any onboarding progress in this tab has been saved.
+              Your session expired. Sign in again to continue.
+              {location.state.from?.pathname === '/onboarding' && ' Your onboarding progress in this tab has been saved.'}
             </div>
           )}
           {error && (
